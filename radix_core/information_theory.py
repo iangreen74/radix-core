@@ -9,14 +9,11 @@ and mutual information analysis for workload optimization.
 import math
 import numpy as np
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Any, Optional, Callable
-from scipy import stats
-from scipy.optimize import minimize
-import networkx as nx
+from dataclasses import dataclass
+from typing import Dict, List, Tuple, Any, Optional
 
 from .logging import get_logger, trace_operation
-from .types import Job, ResourceRequirements
+from .types import Job
 
 
 logger = get_logger(__name__)

@@ -147,8 +147,6 @@ class JobGraph:
         if job_id not in self.nodes:
             return False
 
-        node = self.nodes[job_id]
-
         # Remove all edges involving this job
         edges_to_remove = {e for e in self.edges
                           if e.from_job_id == job_id or e.to_job_id == job_id}

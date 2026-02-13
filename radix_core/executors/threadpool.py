@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import queue
 
-from ..config_v2 import get_config
+from ..config import get_config
 from ..logging import get_logger
 from ..utils.timers import time_operation
 from ..utils.randfail import seeded_failure
@@ -222,7 +222,7 @@ class ThreadPoolExecutor(Generic[T, R]):
         start_time = time.time()
 
         try:
-            with time_operation(f"job_execution_{job.job_id}") as timer:
+            with time_operation(f"job_execution_{job.job_id}"):
                 # Check for failure injection
                 seeded_failure(f"job_execution_{job.job_id}")
 
@@ -327,8 +327,10 @@ class ThreadPoolExecutor(Generic[T, R]):
 
         # Estimate based on duration and resource requirements
         duration_hours = job.estimated_duration() / 3600.0
-        cpu_cost = job.requirements.cpu_cores * duration_hours * self.config.execution.cpu_cost_per_sec_usd * 3600
-        gpu_cost = job.requirements.gpu_count * duration_hours * self.config.execution.gpu_cost_per_sec_usd * 3600
+        cpu_rate = getattr(self.config.execution, 'cpu_cost_per_sec_usd', 0.0)
+        gpu_rate = getattr(self.config.execution, 'gpu_cost_per_sec_usd', 0.0)
+        cpu_cost = job.requirements.cpu_cores * duration_hours * cpu_rate * 3600
+        gpu_cost = job.requirements.gpu_count * duration_hours * gpu_rate * 3600
 
         return cpu_cost + gpu_cost
 

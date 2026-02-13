@@ -11,14 +11,12 @@ import queue
 import statistics
 import json
 import psutil
-import gc
 from collections import defaultdict, deque
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Callable, Union
+from typing import Dict, Optional
 from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 from .config import get_config
@@ -188,10 +186,8 @@ class MetricsCollector:
         try:
             yield
             success = True
-            error = None
-        except Exception as e:
+        except Exception:
             success = False
-            error = str(e)
             raise
         finally:
             end_time = time.time()

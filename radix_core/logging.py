@@ -15,7 +15,7 @@ import uuid
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, Set
+from typing import Dict, Any, Optional
 from contextlib import contextmanager
 from functools import wraps
 
@@ -257,7 +257,6 @@ class ConsoleFormatter(SafetyAwareFormatter):
         level_color = self.COLORS.get(record.levelname, '')
         reset_color = self.COLORS['RESET']
         gray_color = self.COLORS['GRAY']
-        bold_color = self.COLORS['BOLD']
 
         # Safety indicator
         safety_indicator = "🔒" if getattr(record, 'dry_run', True) else "⚠️"

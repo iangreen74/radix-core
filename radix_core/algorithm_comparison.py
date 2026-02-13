@@ -32,14 +32,12 @@ The framework measures performance across multiple dimensions:
 
 import time
 import numpy as np
-from typing import List, Dict, Any, Tuple, Optional, Callable
+from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import statistics
-from concurrent.futures import ThreadPoolExecutor
-import json
 
-from .types import Job, ResourceRequirements, ExecutionResult
+from .types import Job, ResourceRequirements
 from .quantum_orchestration import QuantumEntanglementOrchestrator
 from .information_theory import InformationTheoryOrchestrator
 from .logging import get_logger

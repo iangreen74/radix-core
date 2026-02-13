@@ -14,14 +14,13 @@ Research Focus:
 """
 
 import numpy as np
-from typing import List, Dict, Any, Tuple, Optional, Union
+from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
-import math
 import time
 from collections import defaultdict
 
-from .types import Job, ResourceRequirements, ExecutionResult
+from .types import Job, ResourceRequirements
 from .logging import get_logger
 from .dryrun import DryRunGuard
 from .utils.timers import time_operation

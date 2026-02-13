@@ -6,10 +6,9 @@ Implements placement strategies for distributing jobs across available resources
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
-from collections import defaultdict
+from typing import List, Dict, Any
 
-from ..types import Job, ResourceRequirements
+from ..types import Job
 from ..logging import get_logger
 
 
@@ -172,7 +171,7 @@ class LocalPlacement(PlacementStrategy):
             }
         )
 
-        self.logger.info(f"Local placement completed",
+        self.logger.info("Local placement completed",
                         placed_jobs=len(placements),
                         unplaced_jobs=len(unplaceable_jobs),
                         cpu_utilization=plan.resource_utilization["cpu_utilization"])
@@ -220,7 +219,7 @@ class LoadBalancedPlacement(PlacementStrategy):
 
         # Sort jobs by resource requirements (largest first)
         sorted_jobs = sorted(jobs, key=lambda j: (
-            j.resources.cpu_cores + j.resources.memory_gb + j.resources.gpu_count
+            j.requirements.cpu_cores + j.requirements.memory_mb + j.requirements.gpu_count
         ), reverse=True)
 
         for job in sorted_jobs:
@@ -301,7 +300,7 @@ class LoadBalancedPlacement(PlacementStrategy):
             }
         )
 
-        self.logger.info(f"Load-balanced placement completed",
+        self.logger.info("Load-balanced placement completed",
                         placed_jobs=len(placements),
                         unplaced_jobs=len(unplaceable_jobs),
                         node_count=len(nodes),

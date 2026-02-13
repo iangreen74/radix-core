@@ -18,7 +18,7 @@ except ImportError:
     RAY_AVAILABLE = False
     ray = None
 
-from ..config_v2 import get_config
+from ..config import get_config
 from ..logging import get_logger
 from ..utils.timers import time_operation
 from ..utils.randfail import seeded_failure
@@ -80,7 +80,7 @@ class RayLocalExecutor:
         if not self.config.execution.ray_local_mode:
             raise ValueError("Ray must be in local mode for safety")
 
-        if self.num_gpus > 0 and not self.config.execution.enable_cuda:
+        if self.num_gpus > 0 and not getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)):
             logger.warning("GPU allocation requested but CUDA disabled")
             self.num_gpus = 0
 

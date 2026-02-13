@@ -9,22 +9,19 @@ import json
 import uuid
 import hashlib
 import shutil
-import pickle
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Any, Optional, Union, Callable, Iterator
+from typing import Dict, List, Any, Optional
 from contextlib import contextmanager
 import yaml
 import random
 import numpy as np
 import threading
-from collections import defaultdict
 
 from .config import get_config
-from .logging import get_logger, CorrelationContext, with_correlation_id, trace_operation
-from .metrics_enhanced import get_metrics_collector, MetricsCollector
-from .types import JobSpec, ExecutionResult
+from .logging import get_logger, CorrelationContext, trace_operation
+from .metrics_enhanced import get_metrics_collector
 
 
 @dataclass

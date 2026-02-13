@@ -26,7 +26,7 @@ except ImportError:
     AutoModelForSequenceClassification = pipeline = GenerationConfig = None
     Accelerator = None
 
-from ..config_v2 import get_config
+from ..config import get_config
 from ..logging import get_logger
 from ..utils.timers import time_operation
 from ..utils.randfail import seeded_failure
@@ -103,10 +103,11 @@ class HuggingFaceRunner:
         self.config = get_config()
 
         # Model configuration
-        self.model_name = model_name or self.config.ml.default_model_name
+        ml_config = getattr(self.config, 'ml', None)
+        self.model_name = model_name or getattr(ml_config, 'default_model_name', 'gpt2')
         self.task = task
         self.device = device
-        self.precision = precision or self.config.ml.precision
+        self.precision = precision or getattr(ml_config, 'precision', 'fp16')
 
         # Model state
         self.model = None
@@ -144,9 +145,10 @@ class HuggingFaceRunner:
                            task=self.task)
 
                 # Initialize accelerator for device management
+                enable_cuda = getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False))
                 self.accelerator = Accelerator(
                     mixed_precision=self.precision if self.precision != "fp32" else "no",
-                    cpu=not self.config.execution.enable_cuda or self.device == "cpu"
+                    cpu=not enable_cuda or self.device == "cpu"
                 )
 
                 # Load tokenizer
@@ -167,7 +169,7 @@ class HuggingFaceRunner:
                         self.model_name,
                         trust_remote_code=False,
                         torch_dtype=self._get_torch_dtype(),
-                        device_map="auto" if self.config.execution.enable_cuda else None,
+                        device_map="auto" if getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)) else None,
                         low_cpu_mem_usage=True
                     )
                 elif self.task == "embeddings":
@@ -175,7 +177,7 @@ class HuggingFaceRunner:
                         self.model_name,
                         trust_remote_code=False,
                         torch_dtype=self._get_torch_dtype(),
-                        device_map="auto" if self.config.execution.enable_cuda else None,
+                        device_map="auto" if getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)) else None,
                         low_cpu_mem_usage=True
                     )
                 elif self.task == "classification":
@@ -183,14 +185,14 @@ class HuggingFaceRunner:
                         self.model_name,
                         trust_remote_code=False,
                         torch_dtype=self._get_torch_dtype(),
-                        device_map="auto" if self.config.execution.enable_cuda else None,
+                        device_map="auto" if getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)) else None,
                         low_cpu_mem_usage=True
                     )
                 else:
                     raise ValueError(f"Unsupported task: {self.task}")
 
                 # Prepare model with accelerator
-                if not self.config.execution.enable_cuda:
+                if not getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)):
                     self.model = self.model.to("cpu")
 
                 self.model = self.accelerator.prepare(self.model)
@@ -289,7 +291,7 @@ class HuggingFaceRunner:
                         return_tensors="pt",
                         padding=True,
                         truncation=True,
-                        max_length=self.config.ml.max_sequence_length
+                        max_length=getattr(getattr(self.config, 'ml', None), 'max_sequence_length', 512)
                     )
 
                     # Move to device
@@ -401,7 +403,7 @@ class HuggingFaceRunner:
                         return_tensors="pt",
                         padding=True,
                         truncation=True,
-                        max_length=self.config.ml.max_sequence_length
+                        max_length=getattr(getattr(self.config, 'ml', None), 'max_sequence_length', 512)
                     )
 
                     # Move to device

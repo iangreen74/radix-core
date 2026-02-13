@@ -19,7 +19,7 @@ except ImportError:
     VLLM_AVAILABLE = False
     LLM = SamplingParams = AsyncEngineArgs = None
 
-from ..config_v2 import get_config
+from ..config import get_config
 from ..logging import get_logger
 from ..utils.timers import time_operation
 from ..utils.randfail import seeded_failure
@@ -78,10 +78,11 @@ class VLLMLocalRunner:
         self.available = True
 
         # Model configuration
-        self.model_name = model_name or self.config.ml.default_model_name
+        ml_config = getattr(self.config, 'ml', None)
+        self.model_name = model_name or getattr(ml_config, 'default_model_name', 'gpt2')
         self.tensor_parallel_size = min(tensor_parallel_size, 1)  # Single GPU for safety
         self.gpu_memory_utilization = gpu_memory_utilization
-        self.max_model_len = max_model_len or self.config.ml.max_sequence_length
+        self.max_model_len = max_model_len or getattr(ml_config, 'max_sequence_length', 512)
         self.enforce_eager = enforce_eager
 
         # vLLM engine
@@ -122,7 +123,7 @@ class VLLMLocalRunner:
             return
 
         # Safety checks
-        if not self.config.execution.enable_cuda:
+        if not getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)):
             logger.warning("vLLM requires CUDA but CUDA is disabled")
             self.available = False
             return

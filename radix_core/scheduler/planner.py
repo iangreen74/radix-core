@@ -6,10 +6,10 @@ Implements various planning algorithms for job scheduling and resource allocatio
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime
 
-from ..types import Job, ResourceRequirements
+from ..types import Job
 from ..logging import get_logger
 
 
@@ -52,7 +52,6 @@ class SchedulePlanner(ABC):
         """Sort jobs in topological order based on dependencies."""
         # Simple topological sort implementation
         in_degree = {job.job_id: 0 for job in jobs}
-        job_map = {job.job_id: job for job in jobs}
 
         # Calculate in-degrees
         for job in jobs:
@@ -132,7 +131,7 @@ class GreedyPlanner(SchedulePlanner):
             }
         )
 
-        self.logger.info(f"Created greedy execution plan",
+        self.logger.info("Created greedy execution plan",
                         job_count=len(scheduled_jobs),
                         dependencies_resolved=dependencies_ok,
                         total_cpu=total_cpu,
@@ -172,9 +171,8 @@ class OptimalPlanner(SchedulePlanner):
                            job.requirements.memory_mb +
                            job.requirements.gpu_count * 2)
 
-            return (job.priority * 100 -
-                   job.requirements.max_runtime_seconds or 60 / 60 -
-                   resource_cost)
+            runtime = (job.requirements.max_runtime_seconds or 60) / 60
+            return job.priority * 100 - runtime - resource_cost
 
         # Sort by score within dependency levels
         scheduled_jobs.sort(key=job_score, reverse=True)
@@ -201,7 +199,7 @@ class OptimalPlanner(SchedulePlanner):
             }
         )
 
-        self.logger.info(f"Created optimal execution plan",
+        self.logger.info("Created optimal execution plan",
                         job_count=len(scheduled_jobs),
                         dependencies_resolved=dependencies_ok,
                         optimization_score=plan.plan_metadata["optimization_score"])

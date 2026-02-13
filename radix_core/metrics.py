@@ -7,22 +7,16 @@ for GPU orchestration research with real-time monitoring capabilities.
 
 import time
 import threading
-import queue
 import statistics
 import json
-import psutil
-import gc
 from collections import defaultdict, deque
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Callable, Union
-from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
-import numpy as np
 
 from .config import get_config
-from .logging import get_logger, CorrelationContext
+from .logging import get_logger
 
 logger = get_logger(__name__)
 

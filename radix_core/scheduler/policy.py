@@ -7,7 +7,7 @@ import hashlib
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)

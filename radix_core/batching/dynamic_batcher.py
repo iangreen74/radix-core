@@ -104,7 +104,7 @@ class DynamicBatcher(Generic[T, R]):
         self.processor = processor
 
         # Batch configuration
-        self.max_batch_size = max_batch_size or getattr(self.config, 'batching', type('obj', (object,), {'default_batch_size': 32})).default_batch_size
+        self.max_batch_size = max_batch_size or getattr(self.config.batching, 'default_batch_size', 32)
         self.max_latency_ms = max_latency_ms or 5000  # 5 second default
         self.min_batch_size = min_batch_size
         self.adaptive_sizing = adaptive_sizing
@@ -217,7 +217,6 @@ class DynamicBatcher(Generic[T, R]):
                 return None
 
             batch = []
-            current_time = time.time()
             target_batch_size = self._get_target_batch_size()
 
             # Process queues by priority (highest first)
@@ -263,8 +262,7 @@ class DynamicBatcher(Generic[T, R]):
         if len(self.recent_throughputs) < 10:
             return self.optimal_batch_size
 
-        # Calculate recent average throughput and latency
-        avg_throughput = sum(self.recent_throughputs) / len(self.recent_throughputs)
+        # Calculate recent average latency
         avg_latency = sum(self.recent_latencies) / len(self.recent_latencies)
 
         # Adjust batch size based on performance
@@ -282,7 +280,7 @@ class DynamicBatcher(Generic[T, R]):
         batch_id = f"batch_{int(time.time() * 1000)}"
 
         # Submit to thread pool for processing
-        future = self.executor.submit(self._process_batch, batch_id, batch)
+        self.executor.submit(self._process_batch, batch_id, batch)
 
         # Don't wait for completion in the main loop
         logger.debug("Batch submitted for processing",
@@ -295,7 +293,7 @@ class DynamicBatcher(Generic[T, R]):
         start_time = time.time()
 
         try:
-            with time_operation(f"batch_processing_{len(batch)}") as timer:
+            with time_operation(f"batch_processing_{len(batch)}"):
                 # Extract data from requests
                 batch_data = [req.data for req in batch]
                 request_ids = [req.request_id for req in batch]
@@ -425,18 +423,21 @@ def create_text_batcher(processor: Callable[[List[str]], List[str]],
     """Create a batcher optimized for text processing."""
     config = get_config()
 
+    batch_latency_ms = getattr(config.batching, 'batch_latency_ms', 100)
+    max_batch = getattr(config.batching, 'max_batch_size', config.batching.default_batch_size)
+
     # Strategy-specific configurations
     if strategy == BatchingStrategy.LATENCY_FIRST:
-        max_batch_size = min(16, config.batching.max_batch_size)
-        max_latency_ms = config.batching.batch_latency_ms // 2
+        max_batch_size = min(16, max_batch)
+        max_latency_ms = batch_latency_ms // 2
         adaptive_sizing = False
     elif strategy == BatchingStrategy.THROUGHPUT_FIRST:
-        max_batch_size = config.batching.max_batch_size
-        max_latency_ms = config.batching.batch_latency_ms * 2
+        max_batch_size = max_batch
+        max_latency_ms = batch_latency_ms * 2
         adaptive_sizing = False
     else:  # BALANCED or ADAPTIVE
-        max_batch_size = config.batching.max_batch_size
-        max_latency_ms = config.batching.batch_latency_ms
+        max_batch_size = max_batch
+        max_latency_ms = batch_latency_ms
         adaptive_sizing = (strategy == BatchingStrategy.ADAPTIVE)
 
     return DynamicBatcher(

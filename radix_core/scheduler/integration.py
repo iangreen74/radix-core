@@ -6,7 +6,6 @@ Includes ONNX predictive model integration for runtime and energy prediction.
 
 import asyncio
 import random
-import logging
 import json
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -32,7 +31,7 @@ except ImportError:
 
 # Import the scheduler agent library for local scoring
 try:
-    from agents.scheduler_agent_lib.integration import score_job_local
+    from agents.scheduler_agent_lib.integration import score_job_local  # noqa: F401
     LOCAL_SCORING_AVAILABLE = True
 except ImportError:
     LOCAL_SCORING_AVAILABLE = False
@@ -320,8 +319,6 @@ class InfoScoringClient:
             "colocated_job_types": request.colocated_job_types or []
         }
 
-        last_exception = None
-
         for attempt in range(self.max_retries):
             try:
                 response = await self.client.post(
@@ -335,7 +332,6 @@ class InfoScoringClient:
                     logger.warning(f"Scorer returned {response.status_code}: {response.text}")
 
             except Exception as e:
-                last_exception = e
                 if attempt < self.max_retries - 1:
                     backoff_time = self.backoff_factor ** attempt
                     logger.warning(f"Scorer call failed (attempt {attempt + 1}), retrying in {backoff_time}s: {e}")
