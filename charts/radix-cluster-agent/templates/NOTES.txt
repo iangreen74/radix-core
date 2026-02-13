@@ -1,0 +1,25 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your Radix cluster agent has been deployed to namespace {{ .Release.Namespace }}.
+
+To verify the agent is running:
+
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "radix-cluster-agent.name" . }}
+
+To view agent logs:
+
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "radix-cluster-agent.name" . }} -f
+
+The agent will:
+- Connect to: {{ .Values.apiBase }}
+- Tenant ID: {{ .Values.tenantId }}
+- Cluster ID: {{ .Values.clusterId }}
+- Poll interval: {{ .Values.pollInterval }}s
+
+Check the Radix dashboard to verify your cluster appears as "Active".
+
+To uninstall:
+
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+For more information, visit: https://github.com/iangreen74/radix

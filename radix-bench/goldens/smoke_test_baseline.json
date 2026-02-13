@@ -1,0 +1,27 @@
+{
+  "experiment": "smoke_test",
+  "baseline_scheduler": "fifo",
+  "expected_results": {
+    "fifo": {
+      "throughput_min": 0.05,
+      "throughput_max": 0.15,
+      "avg_wait_time_max": 120.0,
+      "utilization_min": 0.3
+    },
+    "radix": {
+      "improvement_over_fifo_min": 0.10,
+      "throughput_improvement_min": 0.05
+    }
+  },
+  "validation": {
+    "deterministic": true,
+    "seed": 1337,
+    "hash_fields": ["throughput", "avg_wait_time", "total_cost_usd"],
+    "tolerance": 0.001
+  },
+  "metadata": {
+    "created": "2025-01-01T00:00:00Z",
+    "version": "v5.0",
+    "description": "Golden baseline for smoke test validation"
+  }
+}

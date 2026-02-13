@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: radix-webhook }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: radix-webhook } }
+  template:
+    metadata: { labels: { app: radix-webhook } }
+    spec:
+      containers:
+      - name: webhook
+        image: {{ .Values.webhook.image }}
+        imagePullPolicy: IfNotPresent
+        env: [{ name: RADIX_AGENT_URL, value: "http://radix-agent:8080" }]

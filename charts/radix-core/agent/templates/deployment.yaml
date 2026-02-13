@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: radix-agent }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: radix-agent } }
+  template:
+    metadata: { labels: { app: radix-agent } }
+    spec:
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      containers:
+      - name: agent
+        image: {{ .Values.agent.image }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "--models-path=/opt/radix/models"
+          - "--policy=/opt/radix/policy/policy.yaml"
+          - "--ab-canary={{ .Values.enforcement.canaryPercent }}"
+          - "{{- if not .Values.enforcement.enabled }}--advisory-only{{- end }}"
+        ports: [{ name: http, containerPort: 8080 }]
+        resources:
+{{ toYaml .Values.agent.resources | indent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata: { name: radix-agent }
+spec:
+  type: {{ .Values.agent.service.type }}
+  selector: { app: radix-agent }
+  ports: [{ name: http, port: 8080, targetPort: http }]

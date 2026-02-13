@@ -1,0 +1,17 @@
+apiVersion: v2
+name: scheduler-agent
+description: Information-theoretic GPU scheduler agent
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - gpu
+  - scheduling
+  - machine-learning
+  - information-theory
+home: https://github.com/iangreen74/radix
+sources:
+  - https://github.com/iangreen74/radix
+maintainers:
+  - name: Radix Team
+    email: hello@radix.ai

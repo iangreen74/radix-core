@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: radix-dashboard-config }
+data:
+  RADIX_SAVINGS_METHOD: "throughput_delta"
+  RADIX_NAMESPACE: "{{ .Release.Namespace }}"
+  RADIX_REPORT_PVC: "{{ .Values.report.pvcName }}"
+  RADIX_REPORT_IMAGE: "{{ .Values.report.image }}"
+  RADIX_LICENSE_MODE: "{{ .Values.license.source }}"
+  RADIX_ENFORCEMENT_ENABLED: "{{ ternary "true" "false" .Values.enforcement.enabled }}"

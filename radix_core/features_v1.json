@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "features": [
+    "est_input_mb",
+    "cpu_req",
+    "mem_req_gb", 
+    "gpu_req",
+    "gpu_mem_gb",
+    "batch_size",
+    "seq_len",
+    "flops_est_tflops",
+    "prev_runtime_ms",
+    "model_family"
+  ],
+  "targets": [
+    "label_runtime_ms",
+    "label_energy_j"
+  ],
+  "description": "Feature specification v1 for ONNX predictive models. Features must be provided in exact order for inference.",
+  "dtypes": {
+    "est_input_mb": "float64",
+    "cpu_req": "int64",
+    "mem_req_gb": "float64",
+    "gpu_req": "int64", 
+    "gpu_mem_gb": "float64",
+    "batch_size": "int64",
+    "seq_len": "int64",
+    "flops_est_tflops": "float64",
+    "prev_runtime_ms": "int64",
+    "model_family": "object"
+  }
+}

@@ -1,0 +1,30 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionWebhook
+metadata:
+  name: {{ include "scheduler-webhook.fullname" . }}
+  labels:
+    {{- include "scheduler-webhook.labels" . | nindent 4 }}
+  {{- if .Values.tls.certManager.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "scheduler-webhook.certificateName" . }}
+  {{- end }}
+webhooks:
+- name: gpu-scheduler.radix.ai
+  clientConfig:
+    service:
+      name: {{ include "scheduler-webhook.fullname" . }}
+      namespace: {{ .Release.Namespace }}
+      path: "/mutate"
+    {{- if not .Values.tls.certManager.enabled }}
+    caBundle: {{ .Values.tls.caBundle | b64enc }}
+    {{- end }}
+  rules:
+    {{- toYaml .Values.webhook.rules | nindent 4 }}
+  {{- if .Values.webhook.namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml .Values.webhook.namespaceSelector | nindent 4 }}
+  {{- end }}
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  sideEffects: {{ .Values.webhook.sideEffects }}
+  admissionReviewVersions:
+    {{- toYaml .Values.webhook.admissionReviewVersions | nindent 4 }}

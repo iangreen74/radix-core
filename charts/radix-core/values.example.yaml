@@ -1,0 +1,29 @@
+mode: freemium                   # freemium|licensed
+enforcement:
+  enabled: false                 # true only in licensed mode
+  canaryPercent: 0               # 0..100
+egress:
+  enabled: false
+license:
+  source: offline                # offline|api
+  keySecretRef: radix-license
+agent:
+  image: ghcr.io/radix/agent@sha256:PINNED
+  resources:
+    requests: { cpu: "200m", memory: "256Mi" }
+    limits:   { cpu: "1",   memory: "512Mi" }
+  mtls: true
+  service:
+    type: ClusterIP
+webhook:
+  enabled: true
+  image: ghcr.io/radix/webhook@sha256:PINNED
+dashboard:
+  image: ghcr.io/radix/dashboard@sha256:PINNED
+  service:
+    type: ClusterIP
+security:
+  networkPolicy: strict
+report:
+  pvcName: radix-report-pvc
+  image: ghcr.io/radix/report@sha256:PINNED

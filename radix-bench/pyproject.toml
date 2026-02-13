@@ -1,0 +1,55 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "radixbench"
+version = "0.1.0"
+description = "Radix GPU scheduler benchmarking suite"
+authors = ["Radix Team <team@radix.ai>"]
+readme = "README.md"
+packages = [{include = "radixbench", from = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+pydantic = ">=2.7,<2.9"
+numpy = "^1.24.0"
+scipy = "^1.10.0"
+matplotlib = "^3.7.0"
+pandas = "^2.0.0"
+typer = "0.12.5"
+rich = "^13.0.0"
+jsonschema = "^4.17.0"
+pyyaml = "^6.0.3"
+click = "8.1.7"
+scikit-learn = "^1.3.0"
+joblib = "^1.3.0"
+onnxruntime = "^1.16.0"
+skl2onnx = "^1.16.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+black = "^23.0.0"
+ruff = "^0.1.0"
+mypy = "^1.5.0"
+
+[tool.poetry.scripts]
+radix-bench-sim = "radixbench.cli.simulate:main"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "ICN", "PIE", "T20", "SIM", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "NPY", "RUF"]
+ignore = ["E501", "B008", "B904", "TRY003", "PLR0913", "PLR0912", "PLR0915"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310','py311']
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

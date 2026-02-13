@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: radix-dashboard }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: radix-dashboard } }
+  template:
+    metadata: { labels: { app: radix-dashboard } }
+    spec:
+      serviceAccountName: radix-dashboard
+      containers:
+      - name: dashboard
+        image: {{ .Values.dashboard.image }}
+        imagePullPolicy: IfNotPresent
+        command: ["uvicorn","services.dashboard.main:app","--host","0.0.0.0","--port","8080"]
+        ports: [{ name: http, containerPort: 8080 }]
+        envFrom:
+          - configMapRef: { name: radix-dashboard-config }
+        env:
+          - name: RADIX_CLUSTER_UID
+            valueFrom: { fieldRef: { fieldPath: metadata.uid } }
+          - name: RADIX_LICENSE_KEY
+            valueFrom: { secretKeyRef: { name: {{ .Values.license.keySecretRef | quote }}, key: key } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: radix-dashboard }
+spec:
+  type: {{ .Values.dashboard.service.type }}
+  selector: { app: radix-dashboard }
+  ports: [{ name: http, port: 8080, targetPort: http }]

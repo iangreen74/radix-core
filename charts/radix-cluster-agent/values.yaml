@@ -1,0 +1,79 @@
+# Default values for radix-cluster-agent
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Radix API configuration
+apiBase: "https://api.vaultscaler.com"
+
+# Tenant and cluster identification (required)
+tenantId: ""
+clusterId: ""
+
+# One-time token for initial authentication (optional)
+# If not provided, agent will use existing credentials
+oneTimeToken: ""
+
+# Container image configuration
+image:
+  repository: ghcr.io/iangreen74/radix-cluster-agent
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+
+# Container security context
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity rules
+affinity: {}
+
+# Persistence configuration for agent state
+persistence:
+  enabled: false
+  # If enabled, create a PVC for /var/lib/radix
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  # If disabled, use emptyDir (simpler, no persistent state)
+
+# Polling interval in seconds
+pollInterval: 10
+
+# Log level (DEBUG, INFO, WARNING, ERROR)
+logLevel: "INFO"

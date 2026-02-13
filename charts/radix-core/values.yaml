@@ -1,0 +1,153 @@
+mode: freemium
+
+enforcement:
+  enabled: false
+  canaryPercent: 0
+
+egress:
+  enabled: false
+
+license:
+  source: offline
+  keySecretRef: radix-license
+
+agent:
+  image: ghcr.io/radix/agent@sha256:PINNED
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  mtls: true
+  service:
+    type: ClusterIP
+
+webhook:
+  enabled: true
+  image: ghcr.io/radix/webhook@sha256:PINNED
+
+dashboard:
+  image: ghcr.io/radix/dashboard@sha256:PINNED
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  probes:
+    path: /healthz
+    port: 8080
+    startupProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+      failureThreshold: 30
+      periodSeconds: 2
+    readinessProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      failureThreshold: 12
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 8080
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      failureThreshold: 6
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+security:
+  networkPolicy: strict
+  pod:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+        - ALL
+
+report:
+  storage:
+    mode: emptyDir
+    pvcName: radix-report-pvc
+    pvc:
+      storage: 1Gi
+      storageClassName: gp2
+  image: ghcr.io/radix/report@sha256:PINNED
+  timeoutSeconds: 600
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+images:
+  observer:
+    repository: ghcr.io/iangreen74/radix-observer
+    digest: sha256:5267883674ba7231d7391bbd2c45fafaca9085afba11f6377bd33c41e36f839d
+  pinDigests: true
+
+mvp:
+  instantPreview:
+    enabled: false
+  timeSeries:
+    retentionDays: 7
+    storage:
+      mode: emptyDir
+  gpuCollector:
+    enabled: false
+
+networkPolicy:
+  enabled: false
+
+objectStore:
+  mode: disabled
+
+waitlist:
+  ctaEnabled: true
+  url: https://radix.waitlist.example
+  qrEnable: true
+
+radixPlus:
+  enabled: false
+  endpoint: https://api.radixplus.example/v1/hints
+  apiKeySecretRef:
+    name: radixplus-apikey
+
+cloud:
+  enabled: true
+  apiBaseUrl: ""
+  tenantId: ""
+  clusterId: ""
+  apiKeySecretName: ""
+  egress:
+    allowHost: ""
+
+demoLlm:
+  enabled: false
+  image: ghcr.io/iangreen74/radix/demo-llm-service:unlv-demo
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  securityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL

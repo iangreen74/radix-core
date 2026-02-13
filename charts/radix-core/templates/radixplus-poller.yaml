@@ -1,0 +1,57 @@
+{{- if .Values.radixPlus.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: radixplus-poller
+  labels:
+    app.kubernetes.io/name: radixplus-poller
+    app.kubernetes.io/part-of: radix-core
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: radix-core-observer
+          restartPolicy: OnFailure
+          containers:
+            - name: poller
+              image: public.ecr.aws/docker/library/python:3.11-alpine
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh","-lc"]
+              args:
+                - |
+                  set -euo pipefail
+                  apk add --no-cache curl jq openssl
+                  API_KEY=$(cat /var/secrets/radixplus/key)
+                  RES=$(curl -sS -X POST "$RADIXPLUS_ENDPOINT" \
+                    -H "Content-Type: application/json" \
+                    -H "x-radixplus-key: $API_KEY" \
+                    -d '{"queue_depth":0,"base_quantum_ms":50}')
+                  echo "$RES" | jq .
+                  # TODO: Verify signature with KMS public key and TTL before applying
+                  # For scaffold: write ConfigMap placeholder
+                  cat <<EOF | kubectl apply -f -
+                  apiVersion: v1
+                  kind: ConfigMap
+                  metadata:
+                    name: radixplus-params
+                    namespace: radix
+                  data:
+                    params.json: |-
+                      $RES
+                  EOF
+              env:
+                - name: RADIXPLUS_ENDPOINT
+                  value: {{ .Values.radixPlus.endpoint | quote }}
+              volumeMounts:
+                - name: radixplus-secret
+                  mountPath: /var/secrets/radixplus
+                  readOnly: true
+          volumes:
+            - name: radixplus-secret
+              secret:
+                secretName: {{ .Values.radixPlus.apiKeySecretRef.name | default "radixplus-apikey" }}
+{{- end }}

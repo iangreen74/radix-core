@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: radix-ux
+data:
+  pvcHint: |
+    {{- if eq .Values.mvp.timeSeries.storage.mode "pvc" }}
+    If the PVC is Pending, your cluster may lack a default StorageClass/CSI driver.
+    The dashboard will fallback to ephemeral storage; data persists until pod restart.
+    {{- else }}
+    Ephemeral storage in use. Enable PVC in values for 7-day retention.
+    {{- end }}

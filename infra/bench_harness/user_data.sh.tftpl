@@ -1,0 +1,179 @@
+#!/bin/bash
+# Radix Benchmark Harness Bootstrap Script
+# Logs to /var/log/radix-bootstrap.log and console for debugging
+
+# Create directories and log file BEFORE any logging redirection
+mkdir -p /var/lib/radix
+touch /var/log/radix-bootstrap.log || true
+
+exec > >(tee -a /var/log/radix-bootstrap.log | logger -t radix-bootstrap -s 2>/dev/console) 2>&1
+set -euxo pipefail
+
+echo "=== Radix Bootstrap Started: $(date) ==="
+
+# Get instance ID safely (ec2-metadata may not be installed on all AMIs)
+INSTANCE_ID="unknown"
+if command -v ec2-metadata >/dev/null 2>&1; then
+    INSTANCE_ID=$(ec2-metadata --instance-id 2>/dev/null | cut -d' ' -f2 || echo "unknown")
+else
+    # Fallback to IMDS v2
+    TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || echo "")
+    if [ -n "$TOKEN" ]; then
+        INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "unknown")
+    fi
+fi
+echo "Instance ID: $INSTANCE_ID"
+echo "Region: ${aws_region}"
+
+# Check cloud-init status (non-blocking, may not exist)
+CLOUD_INIT_STATUS="unavailable"
+if command -v cloud-init >/dev/null 2>&1; then
+    CLOUD_INIT_STATUS=$(cloud-init status 2>/dev/null || echo "status check failed")
+fi
+echo "Cloud-init stage: $CLOUD_INIT_STATUS"
+sleep 5
+
+# Check if agent bootstrap should be skipped
+ENABLE_AGENT="${enable_agent}"
+if [ "$ENABLE_AGENT" != "true" ]; then
+    echo "Agent bootstrap disabled (enable_agent=${enable_agent}). Skipping Docker/AWSCLI/onboarding/agent."
+    mkdir -p /var/lib/radix
+    touch /var/lib/radix/bootstrap_ran
+    echo "$(date)" > /var/lib/radix/bootstrap_ran
+    echo "=== BOOTSTRAP COMPLETE (agent disabled) ==="
+    exit 0
+fi
+
+# Install Docker if not present
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker..."
+    timeout 600 curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    timeout 600 sh /tmp/get-docker.sh
+    echo "✓ Docker installed"
+else
+    echo "✓ Docker already installed"
+fi
+
+# Ensure Docker is enabled and started (critical for agent)
+systemctl enable docker || true
+systemctl start docker || true
+sleep 3
+
+# Verify Docker is actually running
+if ! systemctl is-active --quiet docker; then
+    echo "❌ Docker service failed to start"
+    systemctl status docker || true
+    exit 1
+fi
+echo "✓ Docker service is running"
+
+# Show disk space after Docker install
+echo "Disk space:"
+df -h
+echo "Docker disk usage:"
+docker system df || true
+
+# Install AWS CLI if not present
+if ! command -v aws &> /dev/null; then
+    echo "Installing AWS CLI..."
+    timeout 300 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+    timeout 60 unzip -q /tmp/awscliv2.zip -d /tmp
+    timeout 120 /tmp/aws/install
+    echo "✓ AWS CLI installed"
+else
+    echo "✓ AWS CLI already installed"
+fi
+
+# Fetch onboarding token from SSM Parameter Store
+echo "Fetching onboarding token from SSM..."
+ONE_TIME_TOKEN=$(timeout 60 aws ssm get-parameter \
+    --name "${ssm_token_param}" \
+    --with-decryption \
+    --region "${aws_region}" \
+    --query 'Parameter.Value' \
+    --output text)
+
+if [ -z "$ONE_TIME_TOKEN" ]; then
+    echo "❌ Failed to fetch onboarding token from SSM"
+    exit 1
+fi
+echo "✓ Onboarding token retrieved"
+
+# Pull agent image (public GHCR image, no auth required)
+echo "Pulling Radix agent image: ${agent_image}..."
+timeout 600 docker pull "${agent_image}"
+echo "✓ Agent image pulled"
+
+# Create persistent data directory
+mkdir -p /var/lib/radix
+echo "✓ Data directory created"
+
+# Start Radix agent
+echo "Starting Radix agent..."
+docker run -d \
+    --name radix-agent \
+    --restart always \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /var/lib/radix:/var/lib/radix \
+    --gpus all \
+    -e RADIX_API_BASE="${radix_api_base}" \
+    -e RADIX_TENANT_ID="${tenant_id}" \
+    -e RADIX_CLUSTER_ID="${cluster_id}" \
+    -e RADIX_ONE_TIME_TOKEN="$ONE_TIME_TOKEN" \
+    "${agent_image}"
+
+# Log API base for diagnostics
+echo "=== Radix Agent Configuration ==="
+echo "RADIX_API_BASE: ${radix_api_base}"
+echo "RADIX_CLUSTER_ID: ${cluster_id}"
+echo "Expected exchange URL: ${radix_api_base}/v1/clusters/${cluster_id}/auth/exchange"
+echo "================================="
+
+# Wait a moment and check status
+sleep 5
+AGENT_RUNNING=false
+if docker ps | grep -q radix-agent; then
+    echo "✓ Radix agent container started successfully"
+    AGENT_RUNNING=true
+else
+    echo "❌ Radix agent container not running"
+fi
+
+# Capture agent logs to disk for observability
+echo "Capturing agent logs to /var/log/radix-agent.log..."
+if [ "$AGENT_RUNNING" = "true" ]; then
+    # Tail logs every 10 seconds for 2 minutes to capture startup behavior
+    for i in $(seq 1 12); do
+        docker logs radix-agent >> /var/log/radix-agent.log 2>&1 || true
+        sleep 10
+    done
+    echo "Agent logs written to /var/log/radix-agent.log"
+else
+    # Dump container state if agent not running
+    echo "Agent container not running - dumping docker state" > /var/log/radix-agent.log
+    docker ps -a >> /var/log/radix-agent.log 2>&1 || true
+    docker logs radix-agent >> /var/log/radix-agent.log 2>&1 || true
+fi
+
+# Show agent logs regardless of status (for diagnostics)
+echo "Agent logs (initial):"
+docker logs radix-agent 2>&1 || echo "Could not retrieve agent logs"
+
+# Create bootstrap marker file (indicates bootstrap script reached agent launch)
+touch /var/lib/radix/bootstrap_ran
+echo "$(date)" > /var/lib/radix/bootstrap_ran
+
+echo "=== BOOTSTRAP COMPLETE ==="
+date
+echo "Docker containers:"
+docker ps -a 2>&1 || true
+echo "Agent logs (last 200 lines):"
+docker logs --tail 200 radix-agent 2>&1 || true
+
+# Exit with error if agent didn't start (but after logging diagnostics)
+if [ "$AGENT_RUNNING" = "false" ]; then
+    echo "❌ Agent failed to start - exiting with error"
+    exit 1
+fi
+
+echo "✓ Bootstrap successful - agent is running"

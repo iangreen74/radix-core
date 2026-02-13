@@ -1,0 +1,45 @@
+{{- if .Values.mvp.instantPreview.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radix-observer
+  labels: { app.kubernetes.io/name: radix-core }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: radix-observer } }
+  template:
+    metadata:
+      labels: { app: radix-observer }
+    spec:
+      serviceAccountName: radix-observer
+      securityContext:
+        seccompProfile: {{ toYaml .Values.security.pod.seccompProfile | nindent 8 }}
+      containers:
+      - name: observer
+        image: {{ include "radix_core.observerImage" . }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "--namespace=$(POD_NAMESPACE)"
+          - "--retentionDays={{ .Values.mvp.timeSeries.retentionDays }}"
+        env:
+          - name: POD_NAMESPACE
+            valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+        securityContext:
+          runAsNonRoot: {{ .Values.security.pod.runAsNonRoot }}
+          readOnlyRootFilesystem: {{ .Values.security.pod.readOnlyRootFilesystem }}
+          capabilities: {{ toYaml .Values.security.pod.capabilities | nindent 12 }}
+        volumeMounts:
+        - name: ts
+          mountPath: /var/radix/ts
+      {{- if not .Values.egress.enabled }}
+      dnsPolicy: ClusterFirst
+      {{- end }}
+      volumes:
+      - name: ts
+      {{- if eq .Values.mvp.timeSeries.storage.mode "pvc" }}
+        persistentVolumeClaim:
+          claimName: radix-timeseries
+      {{- else }}
+        emptyDir: {}
+      {{- end }}
+{{- end }}

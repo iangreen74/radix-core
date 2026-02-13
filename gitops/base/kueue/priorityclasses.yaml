@@ -1,0 +1,44 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: gpu-ultra
+  labels:
+    app.kubernetes.io/component: scheduler
+    app.kubernetes.io/part-of: radix
+description: "Ultra-high priority for critical GPU workloads"
+value: 1000
+globalDefault: false
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: gpu-high
+  labels:
+    app.kubernetes.io/component: scheduler
+    app.kubernetes.io/part-of: radix
+description: "High priority for important GPU workloads"
+value: 750
+globalDefault: false
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: gpu-medium
+  labels:
+    app.kubernetes.io/component: scheduler
+    app.kubernetes.io/part-of: radix
+description: "Medium priority for standard GPU workloads"
+value: 500
+globalDefault: false
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: gpu-default
+  labels:
+    app.kubernetes.io/component: scheduler
+    app.kubernetes.io/part-of: radix
+description: "Default priority for GPU workloads"
+value: 250
+globalDefault: false

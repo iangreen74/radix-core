@@ -1,0 +1,17 @@
+apiVersion: v2
+name: radix-cluster-agent
+description: Radix Core cluster agent for Kubernetes
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - radix
+  - ml
+  - gpu
+  - scheduler
+home: https://github.com/iangreen74/radix
+sources:
+  - https://github.com/iangreen74/radix
+maintainers:
+  - name: Radix Core Team
+    email: support@vaultscaler.com

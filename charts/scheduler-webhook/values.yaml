@@ -1,0 +1,137 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/iangreen74/radix/scheduler-webhook
+  pullPolicy: IfNotPresent
+  tag: "v0.1.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+  port: 443
+  targetPort: 8443
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: webhook
+    scheme: HTTPS
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: webhook
+    scheme: HTTPS
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - scheduler-webhook
+        topologyKey: kubernetes.io/hostname
+
+# Webhook configuration
+webhook:
+  schedulerUrl: "http://scheduler-agent:8080"
+  timeoutSeconds: 5.0
+  enableMutation: true
+
+  # Priority class mapping
+  priorityBuckets:
+    - minScore: 90
+      priorityClassName: "gpu-ultra"
+    - minScore: 70
+      priorityClassName: "gpu-high"
+    - minScore: 50
+      priorityClassName: "gpu-medium"
+    - minScore: 0
+      priorityClassName: "gpu-default"
+
+  # Webhook admission rules
+  rules:
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
+    - operations: ["CREATE", "UPDATE"]
+      apiGroups: ["batch"]
+      apiVersions: ["v1"]
+      resources: ["jobs"]
+
+  # Namespace selector (optional)
+  namespaceSelector:
+    matchLabels:
+      scheduler.radix.ai/enabled: "true"
+
+  # Failure policy
+  failurePolicy: Ignore
+  sideEffects: None
+  admissionReviewVersions: ["v1", "v1beta1"]
+
+# TLS configuration
+tls:
+  # Generate certificates using cert-manager
+  certManager:
+    enabled: true
+    issuer:
+      kind: ClusterIssuer
+      name: selfsigned-cluster-issuer
+
+  # Or provide existing secret
+  existingSecret: ""
+
+  # Certificate duration
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+
+# cert-manager dependency
+cert-manager:
+  enabled: false  # Assuming cert-manager is already installed

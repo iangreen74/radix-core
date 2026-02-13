@@ -1,0 +1,16 @@
+# Minimal smoke configuration for Radix-Bench CLI
+workload:
+  num_jobs: 30
+  arrival_rate: 2.0
+  memory_sizes: [8, 16, 32]
+  memory_weights: [0.5, 0.3, 0.2]
+  runtime_mean: 30.0
+  runtime_std: 10.0
+
+cluster:
+  gpu_types:
+    - { memory_gb: 40, count: 1, compute_capability: "8.0" }
+
+simulation:
+  time_step: 1.0
+  max_time: 600.0

@@ -1,0 +1,82 @@
+{{- if .Values.demoLlm.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-llm-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: demo-llm-service
+    component: demo
+spec:
+  replicas: {{ .Values.demoLlm.replicas }}
+  selector:
+    matchLabels:
+      app: demo-llm-service
+  template:
+    metadata:
+      labels:
+        app: demo-llm-service
+        component: demo
+    spec:
+      {{- if .Values.security.pod.runAsNonRoot }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        {{- if .Values.security.pod.seccompProfile }}
+        seccompProfile:
+          type: {{ .Values.security.pod.seccompProfile.type }}
+        {{- end }}
+      {{- end }}
+      containers:
+      - name: demo-llm
+        image: {{ .Values.demoLlm.image }}
+        imagePullPolicy: {{ .Values.demoLlm.imagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 2
+        resources:
+          {{- toYaml .Values.demoLlm.resources | nindent 10 }}
+        {{- if .Values.demoLlm.securityContext }}
+        securityContext:
+          {{- toYaml .Values.demoLlm.securityContext | nindent 10 }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-llm-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: demo-llm-service
+    component: demo
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: demo-llm-service
+{{- end }}

@@ -1,0 +1,28 @@
+# Radix v0 scheduler default configuration
+
+radix_config:
+  # Information-theoretic scoring parameters
+  alpha: 0.1          # Cost penalty weight
+  beta: 0.2           # Delay penalty weight
+
+  # Entropy calculation
+  entropy_window: 20   # Queue history window size
+
+  # Runtime prior learning
+  update_rate: 0.1     # Posterior update rate (0.0 = no learning, 1.0 = replace)
+
+  # Initial priors for job classes (lognormal parameters)
+  initial_priors:
+    small:
+      mu: 0.5          # log(median_runtime) ≈ log(1.6s)
+      sigma: 0.4       # Moderate variance
+    medium:
+      mu: 1.0          # log(median_runtime) ≈ log(2.7s)
+      sigma: 0.5       # Higher variance
+    large:
+      mu: 1.5          # log(median_runtime) ≈ log(4.5s)
+      sigma: 0.6       # Highest variance
+
+# Cost model integration
+cost_awareness: true
+delay_sensitivity: true

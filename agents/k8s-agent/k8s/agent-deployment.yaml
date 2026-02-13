@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: radix-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: radix-agent-secret
+  namespace: radix-system
+type: Opaque
+stringData:
+  agent-api-key: "radix-agent-key-change-in-production"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radix-k8s-agent
+  namespace: radix-system
+  labels:
+    app: radix-k8s-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: radix-k8s-agent
+  template:
+    metadata:
+      labels:
+        app: radix-k8s-agent
+    spec:
+      containers:
+        - name: agent
+          image: YOUR_REGISTRY/radix-k8s-agent:latest
+          env:
+            - name: API_BASE_URL
+              value: "https://api.vaultscaler.com"
+            - name: CLUSTER_ID
+              value: "vault-hub-demo"
+            - name: AGENT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: radix-agent-secret
+                  key: agent-api-key
+            - name: POLL_INTERVAL_SECONDS
+              value: "10"
+            - name: METRICS_INTERVAL_SECONDS
+              value: "30"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"

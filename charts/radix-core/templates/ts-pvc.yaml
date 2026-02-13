@@ -1,0 +1,10 @@
+{{- if and .Values.mvp.instantPreview.enabled (eq .Values.mvp.timeSeries.storage.mode "pvc") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: radix-timeseries
+  labels: { app.kubernetes.io/name: radix-core }
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources: { requests: { storage: 1Gi } }
+{{- end }}

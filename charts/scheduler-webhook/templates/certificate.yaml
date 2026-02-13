@@ -1,0 +1,24 @@
+{{- if and .Values.tls.certManager.enabled (not .Values.tls.existingSecret) }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "scheduler-webhook.certificateName" . }}
+  labels:
+    {{- include "scheduler-webhook.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "scheduler-webhook.certificateName" . }}
+  duration: {{ .Values.tls.duration }}
+  renewBefore: {{ .Values.tls.renewBefore }}
+  subject:
+    organizations:
+      - radix
+  commonName: {{ include "scheduler-webhook.webhookName" . }}
+  dnsNames:
+    - {{ include "scheduler-webhook.fullname" . }}
+    - {{ include "scheduler-webhook.fullname" . }}.{{ .Release.Namespace }}
+    - {{ include "scheduler-webhook.fullname" . }}.{{ .Release.Namespace }}.svc
+    - {{ include "scheduler-webhook.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    kind: {{ .Values.tls.certManager.issuer.kind }}
+    name: {{ .Values.tls.certManager.issuer.name }}
+{{- end }}

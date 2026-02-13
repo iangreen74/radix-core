@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# Testing
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.pytest_cache/
+coverage.xml
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+logs/
+outputs/
+checkpoints/
+*.log
+
+# Jupyter
+.ipynb_checkpoints
+
+# Poetry
+poetry.lock
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+
+# SAM
+**/.aws-sam/
+
+# Artifacts
+artifacts/
+*.onnx
+*.joblib

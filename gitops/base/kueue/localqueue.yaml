@@ -1,0 +1,44 @@
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  namespace: default
+  name: gpu-local-queue
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  clusterQueue: gpu-cluster-queue
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  namespace: gpu-workloads
+  name: gpu-local-queue
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  clusterQueue: gpu-cluster-queue
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  namespace: training
+  name: training-queue
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  clusterQueue: gpu-cluster-queue
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  namespace: inference
+  name: inference-queue
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  clusterQueue: gpu-cluster-queue

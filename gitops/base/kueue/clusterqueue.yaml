@@ -1,0 +1,87 @@
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: a100-80gb
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  nodeLabels:
+    gpu.nvidia.com/class: A100-80GB
+    node.kubernetes.io/instance-type: p4d.24xlarge
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: a100-40gb
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  nodeLabels:
+    gpu.nvidia.com/class: A100-40GB
+    node.kubernetes.io/instance-type: p4d.12xlarge
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: l4-24gb
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  nodeLabels:
+    gpu.nvidia.com/class: L4-24GB
+    node.kubernetes.io/instance-type: g6.xlarge
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: h100-80gb
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  nodeLabels:
+    gpu.nvidia.com/class: H100-80GB
+    node.kubernetes.io/instance-type: p5.48xlarge
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: gpu-cluster-queue
+  labels:
+    app.kubernetes.io/component: kueue
+    app.kubernetes.io/part-of: radix
+spec:
+  namespaceSelector: {}
+  queueingStrategy: BestEffortFIFO
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: Never
+    borrowWithinCohort:
+      policy: Never
+  resourceGroups:
+  - coveredResources: ["nvidia.com/gpu"]
+    flavors:
+    - name: h100-80gb
+      resources:
+      - name: "nvidia.com/gpu"
+        nominalQuota: 32
+        borrowingLimit: 0
+    - name: a100-80gb
+      resources:
+      - name: "nvidia.com/gpu"
+        nominalQuota: 64
+        borrowingLimit: 16
+    - name: a100-40gb
+      resources:
+      - name: "nvidia.com/gpu"
+        nominalQuota: 32
+        borrowingLimit: 8
+    - name: l4-24gb
+      resources:
+      - name: "nvidia.com/gpu"
+        nominalQuota: 16
+        borrowingLimit: 4

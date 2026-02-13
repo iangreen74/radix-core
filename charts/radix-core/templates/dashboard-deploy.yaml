@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radix-dashboard
+  labels:
+    app.kubernetes.io/name: radix-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: radix-dashboard
+  template:
+    metadata:
+      labels:
+        app: radix-dashboard
+        app.kubernetes.io/name: radix-dashboard
+    spec:
+      serviceAccountName: radix-dashboard
+      containers:
+        - name: dashboard
+          image: {{ .Values.dashboard.image | default "radix-dashboard:dev" }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JOB_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: REPORT_STORAGE_MODE
+              value: {{ default "emptyDir" .Values.report.storage.mode | quote }}
+            - name: REPORT_PVC_NAME
+              value: {{ default "radix-report-pvc" .Values.report.storage.pvcName | quote }}
+            - name: REPORT_TIMEOUT
+              value: {{ .Values.report.timeoutSeconds | default 600 | quote }}
+            - name: RADIX_MVP_INSTANT_PREVIEW
+              value: {{ .Values.mvp.instantPreview.enabled | default true | quote }}
+            - name: RADIX_TS_RETENTION_DAYS
+              value: {{ .Values.mvp.timeSeries.retentionDays | default 7 | quote }}
+            - name: RADIX_UX_PVC_HINT
+              valueFrom:
+                configMapKeyRef:
+                  name: radix-ux
+                  key: pvcHint
+            {{- if .Values.cloud.enabled }}
+            - name: RADIX_CLOUD_ENABLED
+              value: "true"
+            - name: RADIX_CLOUD_BASE_URL
+              value: {{ .Values.cloud.apiBaseUrl | quote }}
+            - name: RADIX_TENANT_ID
+              value: {{ .Values.cloud.tenantId | quote }}
+            - name: RADIX_CLUSTER_ID
+              value: {{ .Values.cloud.clusterId | quote }}
+            {{- if .Values.cloud.apiKeySecretName }}
+            - name: RADIX_API_KEY_PATH
+              value: "/var/run/secrets/radix/api-key"
+            {{- end }}
+            {{- end }}
+          {{- if .Values.dashboard.probes }}
+          {{- with .Values.dashboard.probes.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.dashboard.probes.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.dashboard.probes.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.dashboard.resources }}
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
+          {{- end }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if and .Values.cloud.enabled .Values.cloud.apiKeySecretName }}
+            - name: api-key
+              mountPath: /var/run/secrets/radix
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if and .Values.cloud.enabled .Values.cloud.apiKeySecretName }}
+        - name: api-key
+          secret:
+            secretName: {{ .Values.cloud.apiKeySecretName }}
+        {{- end }}

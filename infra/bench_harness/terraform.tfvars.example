@@ -1,0 +1,18 @@
+# Example Terraform variables for Radix Benchmark Harness
+# Copy this file to terraform.tfvars and customize for your environment
+
+# VPC and Subnet Configuration
+vpc_id    = "vpc-0cd77a3a159a54896"
+subnet_id = "subnet-0c993c1cdd523150d"
+
+# AWS Region
+region = "us-west-2"
+
+# Resource Naming
+name_prefix = "radix-bench"
+
+# Optional: Additional tags
+tags = {
+  Environment = "production"
+  Owner       = "platform-team"
+}

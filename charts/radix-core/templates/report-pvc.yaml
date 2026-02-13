@@ -1,0 +1,18 @@
+{{- if eq (default "emptyDir" .Values.report.storage.mode) "pvc" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.report.storage.pvcName | quote }}
+  labels:
+    app: radix-report
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ default "1Gi" .Values.report.storage.pvc.storage }}
+{{- $sc := default "gp2" .Values.report.storage.pvc.storageClassName }}
+{{- if $sc }}
+  storageClassName: {{ $sc | quote }}
+{{- end }}
+{{- end }}

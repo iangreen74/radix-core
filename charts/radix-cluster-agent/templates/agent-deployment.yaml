@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "radix-cluster-agent.fullname" . }}
+  labels:
+    {{- include "radix-cluster-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "radix-cluster-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "radix-cluster-agent.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "radix-cluster-agent.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: agent
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: RADIX_API_BASE
+          value: {{ .Values.apiBase | quote }}
+        - name: RADIX_TENANT_ID
+          value: {{ .Values.tenantId | quote }}
+        - name: RADIX_CLUSTER_ID
+          value: {{ .Values.clusterId | quote }}
+        {{- if .Values.oneTimeToken }}
+        - name: RADIX_ONE_TIME_TOKEN
+          value: {{ .Values.oneTimeToken | quote }}
+        {{- end }}
+        - name: RADIX_POLL_INTERVAL
+          value: {{ .Values.pollInterval | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.logLevel | quote }}
+        volumeMounts:
+        - name: agent-data
+          mountPath: /var/lib/radix
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: agent-data
+        {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "radix-cluster-agent.fullname" . }}
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

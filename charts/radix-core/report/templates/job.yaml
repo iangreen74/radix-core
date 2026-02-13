@@ -1,0 +1,14 @@
+apiVersion: batch/v1
+kind: Job
+metadata: { name: radix-report }
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      volumes: [{ name: out, persistentVolumeClaim: { claimName: {{ .Values.report.pvcName | quote }} } }]
+      containers:
+      - name: report
+        image: {{ .Values.report.image }}
+        imagePullPolicy: IfNotPresent
+        volumeMounts: [{ name: out, mountPath: /out }]
+        args: ["--write", "/out/report.pdf"]

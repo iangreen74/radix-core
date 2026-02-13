@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+REGION="${region}"
+OWNER="${github_owner}"
+REPO="${github_repo}"
+SSM_PARAM="${ssm_pat_param}"
+LABELS="${runner_labels}"
+RUNNER_DIR="/opt/actions-runner"
+echo "[init] User-data start on `hostname` at `date -u +%FT%TZ`"
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  sudo apt-get update -y
+  sudo apt-get install -y jq curl tar ca-certificates amazon-ssm-agent || true
+  sudo systemctl enable amazon-ssm-agent || true
+  sudo systemctl start amazon-ssm-agent || true
+elif command -v yum >/dev/null 2>&1; then
+  sudo yum -y install --allowerasing jq curl tar ca-certificates amazon-ssm-agent || true
+  sudo dnf install -y libicu dotnet-runtime-6.0 || true
+  sudo systemctl enable amazon-ssm-agent || true
+  sudo systemctl start amazon-ssm-agent || true
+fi
+PAT=`aws ssm get-parameter --name "$${SSM_PARAM}" --with-decryption --region "$${REGION}" --query 'Parameter.Value' --output text 2>/dev/null || true`
+if [ -z "$${PAT}" ] || [ "$${PAT}" = "None" ]; then
+  echo "FATAL: Missing PAT in SSM at $${SSM_PARAM}" >&2
+  exit 20
+fi
+echo "[pat] Loaded PAT from SSM (masked prefix)"
+REG_TOKEN=`curl -X POST -fsSL \
+  -H "Authorization: token $${PAT}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/$${OWNER}/$${REPO}/actions/runners/registration-token" \
+  | jq -r '.token'`
+if [ -z "$${REG_TOKEN}" ] || [ "$${REG_TOKEN}" = "null" ]; then
+  echo "FATAL: Could not obtain GitHub runner registration token. Check PAT scopes." >&2
+  exit 21
+fi
+sudo mkdir -p "$${RUNNER_DIR}"
+sudo chown ec2-user:ec2-user "$${RUNNER_DIR}" || true
+cd "$${RUNNER_DIR}"
+if [ ! -f "./config.sh" ]; then
+  VER=`curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name' | sed 's/^v//'`
+  TARBALL="actions-runner-linux-x64-$${VER}.tar.gz"
+  echo "[runner] Downloading $${TARBALL} ..."
+  curl -fL -o "$${TARBALL}" "https://github.com/actions/runner/releases/download/v$${VER}/$${TARBALL}"
+  tar xzf "$${TARBALL}"
+  sudo chown -R ec2-user:ec2-user "$${RUNNER_DIR}"
+  sudo ./bin/installdependencies.sh || true
+fi
+if [ ! -f ".runner" ]; then
+  echo "[runner] Configuring..."
+  sudo -u ec2-user ./config.sh --url "https://github.com/$${OWNER}/$${REPO}" --token "$${REG_TOKEN}" --labels "$${LABELS}" --name "radix-ec2-`hostname`" --unattended --replace
+else
+  echo "[runner] Already configured."
+fi
+sudo ./svc.sh install ec2-user || true
+sudo ./svc.sh start || true
+sleep 3
+sudo systemctl status "actions.runner*" --no-pager || true
+echo "[done] User-data completed at `date -u +%FT%TZ`"

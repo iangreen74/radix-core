@@ -1,0 +1,135 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-train-gpt
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: radix-demo
+    app.kubernetes.io/component: training
+    app.kubernetes.io/job-type: train-gpt
+  annotations:
+    app.kubernetes.io/job-type: "train-gpt"
+    gpu.mem.gi: "80"
+    ml.batch_size: "4"
+    scheduler.radix.ai/tenant: "research"
+    scheduler.radix.ai/priority: "ultra"
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: radix-demo
+        app.kubernetes.io/component: training
+        app.kubernetes.io/job-type: train-gpt
+      annotations:
+        app.kubernetes.io/job-type: "train-gpt"
+        gpu.mem.gi: "80"
+        ml.batch_size: "4"
+        scheduler.radix.ai/tenant: "research"
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: trainer
+        image: busybox:1.36
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c"]
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          seccompProfile:
+            type: RuntimeDefault
+        args:
+        - |
+          echo "Starting GPT training simulation..."
+          echo "Job Type: train-gpt"
+          echo "GPU Memory Required: 80GB"
+          echo "Batch Size: 4"
+          echo "Tenant: research"
+          echo "Simulating large model training for 45 seconds..."
+          sleep 45
+          echo "GPT training completed successfully!"
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+        env:
+        - name: JOB_TYPE
+          value: "train-gpt"
+        - name: GPU_MEMORY_GB
+          value: "80"
+        - name: BATCH_SIZE
+          value: "4"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-inference-llama
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: radix-demo
+    app.kubernetes.io/component: inference
+    app.kubernetes.io/job-type: inference-llama
+  annotations:
+    app.kubernetes.io/job-type: "inference-llama"
+    gpu.mem.gi: "32"
+    ml.batch_size: "1"
+    scheduler.radix.ai/tenant: "production"
+    scheduler.radix.ai/priority: "low"
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: radix-demo
+        app.kubernetes.io/component: inference
+        app.kubernetes.io/job-type: inference-llama
+      annotations:
+        app.kubernetes.io/job-type: "inference-llama"
+        gpu.mem.gi: "32"
+        ml.batch_size: "1"
+        scheduler.radix.ai/tenant: "production"
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: inference
+        image: busybox:1.36
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c"]
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          seccompProfile:
+            type: RuntimeDefault
+        args:
+        - |
+          echo "Starting LLaMA inference simulation..."
+          echo "Job Type: inference-llama"
+          echo "GPU Memory Required: 32GB"
+          echo "Batch Size: 1"
+          echo "Tenant: production"
+          echo "Simulating inference for 15 seconds..."
+          sleep 15
+          echo "LLaMA inference completed successfully!"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+            nvidia.com/gpu: "1"
+        env:
+        - name: JOB_TYPE
+          value: "inference-llama"
+        - name: GPU_MEMORY_GB
+          value: "32"
+        - name: BATCH_SIZE
+          value: "1"

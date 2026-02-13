@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radix-agent
+  labels:
+    app.kubernetes.io/name: radix-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: radix-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: radix-agent
+    spec:
+      containers:
+        - name: agent
+          image: {{ .Values.agent.image | default "radix-agent:dev" }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            {{- if .Values.cloud.enabled }}
+            - name: RADIX_CLOUD_ENABLED
+              value: "true"
+            - name: RADIX_CLOUD_API_BASE
+              value: {{ .Values.cloud.apiBase | default "https://api.vaultscaler.com" | quote }}
+            - name: RADIX_CLUSTER_ID
+              value: {{ .Values.cloud.clusterId | default "vault-hub-demo" | quote }}
+            {{- if .Values.cloud.tenantId }}
+            - name: RADIX_TENANT_ID
+              value: {{ .Values.cloud.tenantId | quote }}
+            {{- end }}
+            {{- if .Values.cloud.apiKeySecretName }}
+            - name: RADIX_CLOUD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cloud.apiKeySecretName }}
+                  key: api-key
+            {{- end }}
+            - name: RADIX_TELEMETRY_INTERVAL
+              value: {{ .Values.cloud.telemetryInterval | default "10" | quote }}
+            - name: RADIX_LLM_SYNTHETIC_ENABLED
+              value: {{ .Values.cloud.llmSyntheticEnabled | default "true" | quote }}
+            - name: RADIX_LLM_WORKFLOWS
+              value: {{ .Values.cloud.llmWorkflows | default "llm-chatbot-demo,doc-summarizer,graph-nlp-pipeline" | quote }}
+            {{- if .Values.demoLlm.enabled }}
+            - name: DEMO_LLM_ENABLED
+              value: "true"
+            - name: DEMO_LLM_BASE_URL
+              value: "http://demo-llm-service.{{ .Release.Namespace }}.svc.cluster.local:8080"
+            - name: DEMO_LLM_WORKFLOW_ID
+              value: "llm-chatbot-demo"
+            {{- end }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: 8081
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: radix-agent
+  labels:
+    app.kubernetes.io/name: radix-agent
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: radix-agent
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8081
