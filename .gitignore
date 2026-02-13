@@ -44,7 +44,7 @@ checkpoints/
 .ipynb_checkpoints
 
 # Poetry
-poetry.lock
+# poetry.lock is tracked — pinned deps ensure reproducible installs
 
 # Terraform
 .terraform/

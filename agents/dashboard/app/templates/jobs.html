@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Jobs — {{ settings.dashboard_title }}{% endblock %}
+
+{% block page_title %}Job Queue{% endblock %}
+
+{% block header_actions %}
+<span class="text-muted">{{ now | default("") }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="card-grid card-grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Submit Job</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" action="/jobs/submit" class="form">
+                <div class="form-group">
+                    <label for="job_name">Job Name</label>
+                    <input type="text" id="job_name" name="job_name" required placeholder="my-training-job">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="job_type">Job Type</label>
+                        <select id="job_type" name="job_type">
+                            <option value="training">Training</option>
+                            <option value="inference">Inference</option>
+                            <option value="fine-tuning">Fine-tuning</option>
+                            <option value="batch">Batch Processing</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="gpu_type">GPU Type</label>
+                        <select id="gpu_type" name="gpu_type">
+                            <option value="A100-80GB">A100-80GB</option>
+                            <option value="A100-40GB">A100-40GB</option>
+                            <option value="H100-80GB">H100-80GB</option>
+                            <option value="L4">L4</option>
+                            <option value="T4">T4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gpu_count">GPU Count</label>
+                        <input type="number" id="gpu_count" name="gpu_count" value="1" min="1" max="8">
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">Priority (1-10)</label>
+                        <input type="number" id="priority" name="priority" value="5" min="1" max="10">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit Job</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Scheduler Info</h3>
+        </div>
+        <div class="card-body">
+            {% if scheduler_metrics.config is defined %}
+            <table class="table-compact">
+                <tr><td>Service</td><td>{{ scheduler_metrics.service | default("—") }}</td></tr>
+                <tr><td>Version</td><td>{{ scheduler_metrics.version | default("—") }}</td></tr>
+            </table>
+            {% else %}
+            <p class="text-muted">Scheduler agent not reachable. Jobs will be queued and scored once the scheduler is available.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Job Queue</h3>
+        <span class="badge badge-muted">{{ jobs | length }} jobs</span>
+    </div>
+    <div class="card-body">
+        {% if jobs %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>GPU</th>
+                    <th>Count</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Score</th>
+                    <th>Submitted</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs %}
+                <tr>
+                    <td><strong>{{ job.name }}</strong></td>
+                    <td>{{ job.type }}</td>
+                    <td>{{ job.gpu_type }}</td>
+                    <td>{{ job.gpu_count }}</td>
+                    <td>{{ job.priority }}</td>
+                    <td>
+                        {% if job.status == "scored" %}
+                        <span class="badge badge-ok">{{ job.status }}</span>
+                        {% elif job.status == "pending" %}
+                        <span class="badge badge-warn">{{ job.status }}</span>
+                        {% else %}
+                        <span class="badge badge-muted">{{ job.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ job.score if job.score is not none else "—" }}</td>
+                    <td class="text-muted">{{ job.submitted_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted text-center">No jobs submitted yet. Use the form above to submit a job.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Overview — {{ settings.dashboard_title }}{% endblock %}
+
+{% block page_title %}Cluster Overview{% endblock %}
+
+{% block header_actions %}
+<span class="text-muted" id="last-updated">{{ now | default("Loading...") }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="card-grid">
+    <div class="card card-stat">
+        <div class="card-label">GPU Nodes</div>
+        <div class="card-value" id="gpu-nodes">{{ preview.gpu_nodes | default(0) }}</div>
+        <div class="card-sub">Active in cluster</div>
+    </div>
+    <div class="card card-stat">
+        <div class="card-label">Pending Jobs</div>
+        <div class="card-value" id="pending-jobs">{{ preview.pending | default(0) }}</div>
+        <div class="card-sub">Awaiting scheduling</div>
+    </div>
+    <div class="card card-stat">
+        <div class="card-label">Est. Improvement</div>
+        <div class="card-value card-value-highlight" id="improvement">{{ preview.estimated_improvement_now_pct | default(0) }}%</div>
+        <div class="card-sub">With Radix scheduling</div>
+    </div>
+    <div class="card card-stat">
+        <div class="card-label">Timeseries Points</div>
+        <div class="card-value" id="ts-points">{{ timeseries.total_points | default(0) }}</div>
+        <div class="card-sub">Retention: {{ settings.radix_ts_retention_days }}d</div>
+    </div>
+</div>
+
+<div class="card-grid card-grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Scheduler Status</h3>
+            {% if scheduler.service is defined and scheduler.service != "unavailable" %}
+            <span class="badge badge-ok">Connected</span>
+            {% else %}
+            <span class="badge badge-warn">Unavailable</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if scheduler.config is defined %}
+            <table class="table-compact">
+                <tr><td>Service</td><td>{{ scheduler.service | default("—") }}</td></tr>
+                <tr><td>Version</td><td>{{ scheduler.version | default("—") }}</td></tr>
+                {% if scheduler.config is defined %}
+                <tr><td>Uncertainty Lambda</td><td>{{ scheduler.config.lambda_uncertainty | default("—") }}</td></tr>
+                <tr><td>Exploration Beta</td><td>{{ scheduler.config.beta_exploration | default("—") }}</td></tr>
+                <tr><td>Exploration Cap</td><td>{{ scheduler.config.exploration_cap | default("—") }}</td></tr>
+                {% endif %}
+            </table>
+            {% else %}
+            <p class="text-muted">Scheduler agent not reachable. It will appear here once the service is running.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Cluster Configuration</h3>
+            <span class="badge badge-info">{{ settings.radix_license_mode }}</span>
+        </div>
+        <div class="card-body">
+            <table class="table-compact">
+                <tr><td>Namespace</td><td>{{ settings.radix_namespace }}</td></tr>
+                <tr><td>Enforcement</td><td>{{ settings.radix_enforcement_enabled }}</td></tr>
+                <tr><td>Savings Method</td><td>{{ settings.radix_savings_method }}</td></tr>
+                <tr><td>Instant Preview</td><td>{{ settings.radix_mvp_instant_preview }}</td></tr>
+                <tr><td>TS Retention</td><td>{{ settings.radix_ts_retention_days }} days</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if preview.error is defined %}
+<div class="alert alert-warn">
+    <strong>Observer connection issue:</strong> {{ preview.error }}
+    <br><small>The dashboard will show live data once the observer service is running.</small>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function refreshOverview() {
+    try {
+        const resp = await fetch('/api/overview');
+        const data = await resp.json();
+        document.getElementById('gpu-nodes').textContent = data.preview.gpu_nodes ?? 0;
+        document.getElementById('pending-jobs').textContent = data.preview.pending ?? 0;
+        document.getElementById('improvement').textContent = (data.preview.estimated_improvement_now_pct ?? 0) + '%';
+        document.getElementById('ts-points').textContent = data.timeseries.total_points ?? 0;
+        document.getElementById('last-updated').textContent = data.now;
+    } catch (e) {
+        console.warn('Auto-refresh failed:', e);
+    }
+}
+setInterval(refreshOverview, {{ settings.refresh_interval_seconds * 1000 }});
+</script>
+{% endblock %}

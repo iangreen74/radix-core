@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ settings.dashboard_title }}{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="logo-icon">&#9662;</span>
+                <span class="logo-text">Radix Core</span>
+            </div>
+            <span class="version">v0.1.0</span>
+        </div>
+        <ul class="nav-links">
+            <li class="{% if page == 'overview' %}active{% endif %}">
+                <a href="/overview">
+                    <span class="nav-icon">&#9632;</span>
+                    Overview
+                </a>
+            </li>
+            <li class="{% if page == 'jobs' %}active{% endif %}">
+                <a href="/jobs">
+                    <span class="nav-icon">&#9654;</span>
+                    Jobs
+                </a>
+            </li>
+            <li class="{% if page == 'metrics' %}active{% endif %}">
+                <a href="/metrics">
+                    <span class="nav-icon">&#9650;</span>
+                    Metrics
+                </a>
+            </li>
+            <li class="{% if page == 'health' %}active{% endif %}">
+                <a href="/health">
+                    <span class="nav-icon">&#9679;</span>
+                    Health
+                </a>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="env-badge">
+                <span class="badge badge-info">{{ settings.radix_license_mode }}</span>
+                <span class="badge badge-muted">{{ settings.radix_namespace }}</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="page-header">
+            <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+            <div class="header-actions">
+                {% block header_actions %}{% endblock %}
+            </div>
+        </header>
+
+        <div class="page-content">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

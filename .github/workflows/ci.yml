@@ -18,8 +18,46 @@ jobs:
       - run: pip install ruff
       - run: ruff check radix_core/ tests/
 
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install black isort
+      - run: black --check radix_core/ tests/
+      - run: isort --check-only radix_core/ tests/
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install mypy
+      - run: mypy radix_core/ --ignore-missing-imports
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install bandit
+      - run: bandit -r radix_core/ -s B101,B603,B404
+
   test:
-    name: Tests
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -34,5 +72,95 @@ jobs:
           pip install --upgrade pip
           pip install -e .
           pip install pytest pytest-cov pytest-mock pytest-asyncio
-      - name: Run tests
-        run: pytest tests/ -x -q --tb=short
+      - name: Run tests with coverage
+        run: pytest tests/ -x -q --tb=short --cov=radix_core --cov-report=term-missing --cov-fail-under=70
+      - name: Upload coverage
+        if: matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-mock pytest-asyncio
+      - name: Run integration tests
+        run: pytest tests/test_integration.py -v --tb=short
+      - name: Verify CLI commands
+        run: |
+          radix-core status
+          radix-core validate
+          radix-core info
+          radix-core plan --count 2
+          radix-core submit "echo test" --name ci-test
+
+  build:
+    name: Build & Package
+    runs-on: ubuntu-latest
+    needs: [lint, format, typecheck, security, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install build tools
+        run: pip install build
+      - name: Build package
+        run: python -m build
+      - name: Verify package
+        run: |
+          pip install dist/*.whl
+          radix-core --help
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build radix-core image
+        run: docker build -t radix-core:ci .
+      - name: Verify radix-core container
+        run: |
+          docker run --rm radix-core:ci status
+          docker run --rm radix-core:ci validate
+      - name: Build dashboard image
+        run: docker build -t radix-dashboard:ci agents/dashboard/
+      - name: Verify dashboard container
+        run: |
+          docker run -d --name dash-test -p 8080:8080 radix-dashboard:ci
+          sleep 3
+          curl -sf http://localhost:8080/healthz || (docker logs dash-test && exit 1)
+          docker stop dash-test
+          docker rm dash-test
+
+  helm-lint:
+    name: Helm Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+      - name: Lint charts
+        run: |
+          for chart in charts/*/Chart.yaml; do
+            chart_dir=$(dirname "$chart")
+            echo "Linting $chart_dir..."
+            helm lint "$chart_dir" || true
+          done

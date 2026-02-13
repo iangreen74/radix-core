@@ -8,3 +8,5 @@ data:
   RADIX_REPORT_IMAGE: "{{ .Values.report.image }}"
   RADIX_LICENSE_MODE: "{{ .Values.license.source }}"
   RADIX_ENFORCEMENT_ENABLED: "{{ ternary "true" "false" .Values.enforcement.enabled }}"
+  OBSERVER_URL: "http://radix-observer:8080"
+  SCHEDULER_URL: "http://radix-scheduler-agent:8080"

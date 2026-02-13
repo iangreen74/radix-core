@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Metrics — {{ settings.dashboard_title }}{% endblock %}
+
+{% block page_title %}Metrics & Timeseries{% endblock %}
+
+{% block content %}
+<div class="card-grid">
+    <div class="card card-stat">
+        <div class="card-label">Data Points</div>
+        <div class="card-value">{{ total_points }}</div>
+        <div class="card-sub">Observer timeseries</div>
+    </div>
+    <div class="card card-stat">
+        <div class="card-label">Scheduler Decisions</div>
+        <div class="card-value">{{ scheduler_metrics.get('scheduler_decisions_total', '—') if scheduler_metrics else '—' }}</div>
+        <div class="card-sub">Total scored</div>
+    </div>
+    <div class="card card-stat">
+        <div class="card-label">Exploration Ratio</div>
+        <div class="card-value">{{ scheduler_metrics.get('scheduler_exploration_ratio', '—') if scheduler_metrics else '—' }}</div>
+        <div class="card-sub">Explore vs exploit</div>
+    </div>
+    <div class="card card-stat">
+        <div class="card-label">Avg Uncertainty</div>
+        <div class="card-value">{{ scheduler_metrics.get('scheduler_avg_uncertainty', '—') if scheduler_metrics else '—' }}</div>
+        <div class="card-sub">Across job-GPU pairs</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Timeseries</h3>
+        <span class="badge badge-muted">Retention: {{ settings.radix_ts_retention_days }}d</span>
+    </div>
+    <div class="card-body">
+        {% if timeseries_data %}
+        <div class="chart-container">
+            <canvas id="timeseriesChart"></canvas>
+        </div>
+        {% else %}
+        <p class="text-muted text-center">No timeseries data available yet. Data will appear here once the observer begins collecting metrics.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if scheduler_metrics %}
+<div class="card">
+    <div class="card-header">
+        <h3>Scheduler Prometheus Metrics</h3>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr><th>Metric</th><th>Value</th></tr>
+            </thead>
+            <tbody>
+                {% for key, value in scheduler_metrics.items() %}
+                <tr>
+                    <td><code>{{ key }}</code></td>
+                    <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if timeseries_data %}
+const tsData = {{ timeseries_data | tojson }};
+if (tsData.length > 0) {
+    const labels = tsData.map((d, i) => i);
+    // Try to extract numeric fields from the first data point
+    const fields = Object.keys(tsData[0]).filter(k => typeof tsData[0][k] === 'number');
+    const datasets = fields.slice(0, 4).map((field, idx) => {
+        const colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444'];
+        return {
+            label: field,
+            data: tsData.map(d => d[field] ?? 0),
+            borderColor: colors[idx % colors.length],
+            backgroundColor: colors[idx % colors.length] + '20',
+            fill: true,
+            tension: 0.3,
+        };
+    });
+    new Chart(document.getElementById('timeseriesChart'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                x: { title: { display: true, text: 'Sample', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+                y: { title: { display: true, text: 'Value', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+            }
+        }
+    });
+}
+{% endif %}
+</script>
+{% endblock %}
