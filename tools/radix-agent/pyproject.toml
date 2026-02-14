@@ -1,0 +1,28 @@
+[project]
+name = "radix-agent"
+version = "0.1.0"
+description = "Infrastructure discovery and control agent for radix-core"
+requires-python = ">=3.9"
+dependencies = [
+    "boto3>=1.28.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.0.0",
+    "typer>=0.9.0,<0.14.0",
+    "rich>=13.7.0",
+    "jinja2>=3.1.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-mock>=3.11.0",
+    "moto[route53,cloudfront,ec2,s3,iam,ssm,elbv2,eks,logs,acm,kms,ecr,apigateway,cognitoidp]>=4.2.0",
+]
+
+[project.scripts]
+radix-agent = "radix_agent.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

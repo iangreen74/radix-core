@@ -13,7 +13,15 @@ class Settings(BaseSettings):
     # Dashboard settings
     dashboard_port: int = 8080
     dashboard_title: str = "Radix Core"
-    refresh_interval_seconds: int = 30
+    refresh_interval_seconds: int = 5
+
+    # Build metadata (injected at image build time)
+    build_commit: str = ""
+    build_branch: str = ""
+    build_timestamp: str = ""
+
+    # Cluster identity
+    cluster_name: str = ""
 
     # Cluster info (injected by Helm)
     radix_namespace: str = "default"

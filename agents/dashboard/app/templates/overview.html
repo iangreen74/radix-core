@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="card-grid">
+<div class="card-grid" style="grid-template-columns: repeat(6, 1fr);">
     <div class="card card-stat">
         <div class="card-label">Efficiency vs FIFO</div>
         <div class="card-value card-value-highlight" id="efficiency-pct">{{ preview.efficiency_pct | default(0) }}%</div>
@@ -29,6 +29,22 @@
         <div class="card-label">GPU Utilization</div>
         <div class="card-value" id="gpu-util">{{ preview.gpu_utilization_pct | default(0) }}%</div>
         <div class="card-sub">Across {{ preview.gpu_nodes | default(0) }} nodes</div>
+    </div>
+    <div class="card card-stat">
+        <div class="card-label">Queue Depth</div>
+        <div class="card-value" id="queue-depth">{{ queue_depth | default(0) }}</div>
+        <div class="card-sub">Pending jobs</div>
+    </div>
+    <div class="card card-stat">
+        <div class="card-label">Radix Score</div>
+        <div class="card-value {% if radix_score | default(0) >= 80 %}card-value-ok{% elif radix_score | default(0) >= 60 %}card-value-warn{% else %}card-value-error{% endif %}" id="radix-score">{{ radix_score | default(0) }}</div>
+        <div class="card-sub">
+            <select id="scoring-profile" style="background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; padding: 0; outline: none;">
+                <option value="balanced" style="background: var(--bg-card);">Balanced</option>
+                <option value="performance" style="background: var(--bg-card);">Performance</option>
+                <option value="cost-optimized" style="background: var(--bg-card);">Cost-Optimized</option>
+            </select>
+        </div>
     </div>
 </div>
 
@@ -206,11 +222,56 @@ async function loadEfficiencyChart() {
 }
 loadEfficiencyChart();
 
+// Store latest API data for profile switching
+let latestOverviewData = null;
+
+function getScoreColor(score) {
+    if (score >= 80) return 'card-value-ok';
+    if (score >= 60) return 'card-value-warn';
+    return 'card-value-error';
+}
+
+function updateRadixScoreDisplay(data) {
+    const profile = document.getElementById('scoring-profile').value;
+    const profiles = data.radix_score_profiles || {};
+    const score = profiles[profile] ?? data.radix_score ?? 0;
+    const el = document.getElementById('radix-score');
+    el.textContent = score;
+    el.className = 'card-value ' + getScoreColor(score);
+}
+
+// Scoring profile selector
+document.getElementById('scoring-profile').addEventListener('change', function() {
+    if (latestOverviewData) {
+        updateRadixScoreDisplay(latestOverviewData);
+    }
+});
+
+// Status banner update
+function updateStatusBanner(status) {
+    const banner = document.querySelector('.status-banner');
+    if (!banner) return;
+    const labels = { operational: 'Operational', degraded: 'Degraded', down: 'Down' };
+    const colors = {
+        operational: { bg: 'rgba(34, 197, 94, 0.1)', fg: 'var(--ok)', border: 'rgba(34, 197, 94, 0.2)' },
+        degraded:    { bg: 'rgba(245, 158, 11, 0.1)', fg: 'var(--warn)', border: 'rgba(245, 158, 11, 0.2)' },
+        down:        { bg: 'rgba(239, 68, 68, 0.1)', fg: 'var(--error)', border: 'rgba(239, 68, 68, 0.2)' },
+    };
+    const c = colors[status] || colors.down;
+    banner.style.background = c.bg;
+    banner.style.color = c.fg;
+    banner.style.borderBottom = '1px solid ' + c.border;
+    banner.lastElementChild ? null : 0;
+    // Update text — keep the dot span, update text after it
+    banner.innerHTML = '<span style="font-size: 8px;">&#9679;</span> ' + (labels[status] || status);
+}
+
 // Auto-refresh
 async function refreshOverview() {
     try {
         const resp = await fetch('/api/overview');
         const data = await resp.json();
+        latestOverviewData = data;
         const p = data.preview;
         document.getElementById('efficiency-pct').textContent = (p.efficiency_pct ?? 0) + '%';
         document.getElementById('throughput').textContent = p.throughput_jobs_per_hour ?? 0;
@@ -223,7 +284,12 @@ async function refreshOverview() {
         document.getElementById('baseline-time').textContent = (p.baseline_completion_time_seconds ?? 0) + 's';
         document.getElementById('radix-time').textContent = (p.avg_completion_time_seconds ?? 0) + 's';
         document.getElementById('improvement-val').textContent = (p.efficiency_pct ?? 0) + '%';
+        document.getElementById('queue-depth').textContent = data.queue_depth ?? p.pending ?? 0;
         document.getElementById('last-updated').textContent = data.now;
+        updateRadixScoreDisplay(data);
+        if (data.system_status) {
+            updateStatusBanner(data.system_status);
+        }
     } catch (e) {
         console.warn('Auto-refresh failed:', e);
     }

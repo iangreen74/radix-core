@@ -59,6 +59,51 @@ async def _fetch_scheduler_info(client: httpx.AsyncClient, scheduler_url: str) -
         return {"service": "unavailable", "error": str(e)}
 
 
+def _compute_system_status(preview: dict, scheduler_info: dict) -> str:
+    """Determine overall system status from health data.
+
+    Returns 'operational', 'degraded', or 'down'.
+    """
+    has_observer_error = "error" in preview
+    has_scheduler_error = "error" in scheduler_info
+    scheduler_unavailable = scheduler_info.get("service") == "unavailable"
+
+    if has_observer_error and (has_scheduler_error or scheduler_unavailable):
+        return "down"
+    if has_observer_error or has_scheduler_error or scheduler_unavailable:
+        return "degraded"
+    return "operational"
+
+
+def _compute_radix_score(
+    preview: dict,
+    profile: str = "balanced",
+) -> int:
+    """Compute composite Radix Score (0-100) from cluster metrics.
+
+    Profiles adjust the weight distribution:
+      - balanced:        GPU 40%, memory 30%, throughput 30%
+      - performance:     GPU 30%, memory 20%, throughput 50%
+      - cost-optimized:  GPU 50%, memory 40%, throughput 10%
+    """
+    weights = {
+        "balanced":       (0.40, 0.30, 0.30),
+        "performance":    (0.30, 0.20, 0.50),
+        "cost-optimized": (0.50, 0.40, 0.10),
+    }
+    w_gpu, w_mem, w_tp = weights.get(profile, weights["balanced"])
+
+    gpu_util = float(preview.get("gpu_utilization_pct", 0))
+    efficiency = float(preview.get("efficiency_pct", 0))
+    throughput_raw = float(preview.get("throughput_jobs_per_hour", 0))
+
+    # Normalize throughput to 0-100 (cap at 100 jobs/hr)
+    throughput_score = min(throughput_raw, 100.0)
+
+    score = gpu_util * w_gpu + efficiency * w_mem + throughput_score * w_tp
+    return max(0, min(100, int(round(score))))
+
+
 @router.get("/overview", response_class=HTMLResponse)
 async def overview_page(request: Request):
     """Main dashboard overview page."""
@@ -69,6 +114,10 @@ async def overview_page(request: Request):
     ts_summary = await _fetch_timeseries_summary(client, settings.observer_url)
     scheduler_info = await _fetch_scheduler_info(client, settings.scheduler_url)
 
+    system_status = _compute_system_status(preview, scheduler_info)
+    queue_depth = preview.get("pending", 0)
+    radix_score = _compute_radix_score(preview)
+
     return templates.TemplateResponse("overview.html", {
         "request": request,
         "settings": settings,
@@ -76,6 +125,9 @@ async def overview_page(request: Request):
         "preview": preview,
         "timeseries": ts_summary,
         "scheduler": scheduler_info,
+        "system_status": system_status,
+        "queue_depth": queue_depth,
+        "radix_score": radix_score,
         "now": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
     })
 
@@ -90,9 +142,21 @@ async def overview_api(request: Request):
     ts_summary = await _fetch_timeseries_summary(client, settings.observer_url)
     scheduler_info = await _fetch_scheduler_info(client, settings.scheduler_url)
 
+    system_status = _compute_system_status(preview, scheduler_info)
+    queue_depth = preview.get("pending", 0)
+    radix_score = _compute_radix_score(preview)
+
     return {
         "preview": preview,
         "timeseries": ts_summary,
         "scheduler": scheduler_info,
+        "system_status": system_status,
+        "queue_depth": queue_depth,
+        "radix_score": radix_score,
+        "radix_score_profiles": {
+            "balanced": _compute_radix_score(preview, "balanced"),
+            "performance": _compute_radix_score(preview, "performance"),
+            "cost-optimized": _compute_radix_score(preview, "cost-optimized"),
+        },
         "now": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
     }

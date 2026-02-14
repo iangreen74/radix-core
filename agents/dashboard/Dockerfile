@@ -2,6 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Build metadata (passed via --build-arg)
+ARG BUILD_COMMIT=""
+ARG BUILD_BRANCH=""
+ARG BUILD_TIMESTAMP=""
+
+ENV BUILD_COMMIT=${BUILD_COMMIT}
+ENV BUILD_BRANCH=${BUILD_BRANCH}
+ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+
 # Create non-root user
 RUN groupadd -r dashboard && useradd -r -g dashboard dashboard
 
