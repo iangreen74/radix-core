@@ -24,6 +24,8 @@ spec:
         env:
           - name: POD_NAMESPACE
             valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+          - name: SCHEDULER_URL
+            value: "http://radix-scheduler-agent:8080"
         securityContext:
           runAsNonRoot: {{ .Values.security.pod.runAsNonRoot }}
           readOnlyRootFilesystem: {{ .Values.security.pod.readOnlyRootFilesystem }}

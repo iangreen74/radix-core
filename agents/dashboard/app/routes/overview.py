@@ -23,7 +23,14 @@ async def _fetch_preview(client: httpx.AsyncClient, observer_url: str) -> dict:
         return r.json()
     except Exception as e:
         logger.warning("Failed to fetch preview: %s", e)
-        return {"gpu_nodes": 0, "pending": 0, "estimated_improvement_now_pct": 0, "error": str(e)}
+        return {
+            "gpu_nodes": 0, "pending": 0, "running": 0,
+            "completed_last_hour": 0,
+            "avg_wait_time_seconds": 0, "avg_completion_time_seconds": 0,
+            "baseline_completion_time_seconds": 0,
+            "efficiency_pct": 0, "throughput_jobs_per_hour": 0,
+            "gpu_utilization_pct": 0, "error": str(e),
+        }
 
 
 async def _fetch_timeseries_summary(client: httpx.AsyncClient, observer_url: str) -> dict:

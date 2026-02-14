@@ -11,68 +11,88 @@
 {% block content %}
 <div class="card-grid">
     <div class="card card-stat">
-        <div class="card-label">GPU Nodes</div>
-        <div class="card-value" id="gpu-nodes">{{ preview.gpu_nodes | default(0) }}</div>
-        <div class="card-sub">Active in cluster</div>
+        <div class="card-label">Efficiency vs FIFO</div>
+        <div class="card-value card-value-highlight" id="efficiency-pct">{{ preview.efficiency_pct | default(0) }}%</div>
+        <div class="card-sub">Radix vs naive scheduling</div>
     </div>
     <div class="card card-stat">
-        <div class="card-label">Pending Jobs</div>
-        <div class="card-value" id="pending-jobs">{{ preview.pending | default(0) }}</div>
-        <div class="card-sub">Awaiting scheduling</div>
+        <div class="card-label">Throughput</div>
+        <div class="card-value" id="throughput">{{ preview.throughput_jobs_per_hour | default(0) }}</div>
+        <div class="card-sub">Jobs / hour</div>
     </div>
     <div class="card card-stat">
-        <div class="card-label">Est. Improvement</div>
-        <div class="card-value card-value-highlight" id="improvement">{{ preview.estimated_improvement_now_pct | default(0) }}%</div>
-        <div class="card-sub">With Radix scheduling</div>
+        <div class="card-label">Avg Wait Time</div>
+        <div class="card-value" id="avg-wait">{{ preview.avg_wait_time_seconds | default(0) }}s</div>
+        <div class="card-sub">Submission to start</div>
     </div>
     <div class="card card-stat">
-        <div class="card-label">Timeseries Points</div>
-        <div class="card-value" id="ts-points">{{ timeseries.total_points | default(0) }}</div>
-        <div class="card-sub">Retention: {{ settings.radix_ts_retention_days }}d</div>
+        <div class="card-label">GPU Utilization</div>
+        <div class="card-value" id="gpu-util">{{ preview.gpu_utilization_pct | default(0) }}%</div>
+        <div class="card-sub">Across {{ preview.gpu_nodes | default(0) }} nodes</div>
     </div>
 </div>
 
 <div class="card-grid card-grid-2">
     <div class="card">
         <div class="card-header">
-            <h3>Scheduler Status</h3>
-            {% if scheduler.service is defined and scheduler.service != "unavailable" %}
-            <span class="badge badge-ok">Connected</span>
-            {% else %}
-            <span class="badge badge-warn">Unavailable</span>
-            {% endif %}
+            <h3>Radix vs FIFO Baseline</h3>
         </div>
         <div class="card-body">
-            {% if scheduler.config is defined %}
-            <table class="table-compact">
-                <tr><td>Service</td><td>{{ scheduler.service | default("—") }}</td></tr>
-                <tr><td>Version</td><td>{{ scheduler.version | default("—") }}</td></tr>
-                {% if scheduler.config is defined %}
-                <tr><td>Uncertainty Lambda</td><td>{{ scheduler.config.lambda_uncertainty | default("—") }}</td></tr>
-                <tr><td>Exploration Beta</td><td>{{ scheduler.config.beta_exploration | default("—") }}</td></tr>
-                <tr><td>Exploration Cap</td><td>{{ scheduler.config.exploration_cap | default("—") }}</td></tr>
-                {% endif %}
+            <canvas id="baseline-chart" height="200"></canvas>
+            <table class="table-compact" style="margin-top: 1rem;">
+                <tr>
+                    <td>FIFO Baseline Avg</td>
+                    <td id="baseline-time">{{ preview.baseline_completion_time_seconds | default(0) }}s</td>
+                </tr>
+                <tr>
+                    <td>Radix Avg</td>
+                    <td id="radix-time">{{ preview.avg_completion_time_seconds | default(0) }}s</td>
+                </tr>
+                <tr>
+                    <td>Improvement</td>
+                    <td id="improvement-val" class="card-value-highlight">{{ preview.efficiency_pct | default(0) }}%</td>
+                </tr>
             </table>
-            {% else %}
-            <p class="text-muted">Scheduler agent not reachable. It will appear here once the service is running.</p>
-            {% endif %}
         </div>
     </div>
 
     <div class="card">
         <div class="card-header">
-            <h3>Cluster Configuration</h3>
-            <span class="badge badge-info">{{ settings.radix_license_mode }}</span>
+            <h3>Cluster Status</h3>
         </div>
         <div class="card-body">
             <table class="table-compact">
-                <tr><td>Namespace</td><td>{{ settings.radix_namespace }}</td></tr>
-                <tr><td>Enforcement</td><td>{{ settings.radix_enforcement_enabled }}</td></tr>
-                <tr><td>Savings Method</td><td>{{ settings.radix_savings_method }}</td></tr>
-                <tr><td>Instant Preview</td><td>{{ settings.radix_mvp_instant_preview }}</td></tr>
-                <tr><td>TS Retention</td><td>{{ settings.radix_ts_retention_days }} days</td></tr>
+                <tr><td>GPU Nodes</td><td id="gpu-nodes">{{ preview.gpu_nodes | default(0) }}</td></tr>
+                <tr><td>Running Jobs</td><td id="running-jobs">{{ preview.running | default(0) }}</td></tr>
+                <tr><td>Pending Jobs</td><td id="pending-jobs">{{ preview.pending | default(0) }}</td></tr>
+                <tr><td>Completed (1hr)</td><td id="completed-hr">{{ preview.completed_last_hour | default(0) }}</td></tr>
             </table>
+
+            {% if scheduler.service is defined and scheduler.service != "unavailable" %}
+            <div style="margin-top: 1rem;">
+                <span class="badge badge-ok">Scheduler Connected</span>
+            </div>
+            <table class="table-compact" style="margin-top: 0.5rem;">
+                <tr><td>Interference</td><td>{{ scheduler.config.gamma_interference | default("—") }}</td></tr>
+                <tr><td>Exploration Cap</td><td>{{ scheduler.config.exploration_cap | default("—") }}</td></tr>
+            </table>
+            {% else %}
+            <div style="margin-top: 1rem;">
+                <span class="badge badge-warn">Scheduler Unavailable</span>
+                <p class="text-muted" style="margin-top: 0.5rem;">Will appear once the scheduler-agent is running.</p>
+            </div>
+            {% endif %}
         </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Efficiency Over Time</h3>
+        <span class="text-muted">{{ timeseries.total_points | default(0) }} data points</span>
+    </div>
+    <div class="card-body">
+        <canvas id="efficiency-chart" height="120"></canvas>
     </div>
 </div>
 
@@ -85,15 +105,124 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
+// Baseline comparison bar chart
+const baselineCtx = document.getElementById('baseline-chart').getContext('2d');
+const baselineVal = {{ preview.baseline_completion_time_seconds | default(0) }};
+const radixVal = {{ preview.avg_completion_time_seconds | default(0) }};
+new Chart(baselineCtx, {
+    type: 'bar',
+    data: {
+        labels: ['FIFO Baseline', 'Radix Scheduler'],
+        datasets: [{
+            data: [baselineVal, radixVal],
+            backgroundColor: ['#6b7280', '#10b981'],
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+            x: {
+                title: { display: true, text: 'Avg Completion Time (s)', color: '#9ca3af' },
+                ticks: { color: '#9ca3af' },
+                grid: { color: '#374151' }
+            },
+            y: { ticks: { color: '#e5e7eb' }, grid: { display: false } }
+        }
+    }
+});
+
+// Efficiency timeseries chart (from observer data)
+async function loadEfficiencyChart() {
+    try {
+        const resp = await fetch('/api/overview');
+        const data = await resp.json();
+        const ts = data.timeseries?.latest ? [data.timeseries.latest] : [];
+
+        // Try to get full timeseries from observer
+        try {
+            const tsResp = await fetch('{{ settings.observer_url }}/v1/timeseries');
+            const tsData = await tsResp.json();
+            if (tsData.data && tsData.data.length > 0) {
+                const labels = tsData.data.map((d, i) => {
+                    if (d.timestamp) {
+                        const dt = new Date(d.timestamp * 1000);
+                        return dt.toLocaleTimeString();
+                    }
+                    return i;
+                });
+                const effValues = tsData.data.map(d => d.efficiency_pct || 0);
+
+                const ctx = document.getElementById('efficiency-chart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels.slice(-60),
+                        datasets: [{
+                            label: 'Efficiency %',
+                            data: effValues.slice(-60),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                        }]
+                    },
+                    options: {
+                        plugins: { legend: { labels: { color: '#e5e7eb' } } },
+                        scales: {
+                            x: { ticks: { color: '#9ca3af', maxTicksLimit: 10 }, grid: { color: '#374151' } },
+                            y: {
+                                min: 0, max: 100,
+                                title: { display: true, text: 'Efficiency %', color: '#9ca3af' },
+                                ticks: { color: '#9ca3af' },
+                                grid: { color: '#374151' }
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+        } catch (e) {}
+
+        // Fallback: empty chart
+        const ctx = document.getElementById('efficiency-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: { labels: ['No data yet'], datasets: [{ label: 'Efficiency %', data: [0], borderColor: '#6b7280' }] },
+            options: {
+                plugins: { legend: { labels: { color: '#e5e7eb' } } },
+                scales: {
+                    y: { min: 0, max: 100, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+                    x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+                }
+            }
+        });
+    } catch (e) {
+        console.warn('Failed to load efficiency chart:', e);
+    }
+}
+loadEfficiencyChart();
+
+// Auto-refresh
 async function refreshOverview() {
     try {
         const resp = await fetch('/api/overview');
         const data = await resp.json();
-        document.getElementById('gpu-nodes').textContent = data.preview.gpu_nodes ?? 0;
-        document.getElementById('pending-jobs').textContent = data.preview.pending ?? 0;
-        document.getElementById('improvement').textContent = (data.preview.estimated_improvement_now_pct ?? 0) + '%';
-        document.getElementById('ts-points').textContent = data.timeseries.total_points ?? 0;
+        const p = data.preview;
+        document.getElementById('efficiency-pct').textContent = (p.efficiency_pct ?? 0) + '%';
+        document.getElementById('throughput').textContent = p.throughput_jobs_per_hour ?? 0;
+        document.getElementById('avg-wait').textContent = (p.avg_wait_time_seconds ?? 0) + 's';
+        document.getElementById('gpu-util').textContent = (p.gpu_utilization_pct ?? 0) + '%';
+        document.getElementById('gpu-nodes').textContent = p.gpu_nodes ?? 0;
+        document.getElementById('running-jobs').textContent = p.running ?? 0;
+        document.getElementById('pending-jobs').textContent = p.pending ?? 0;
+        document.getElementById('completed-hr').textContent = p.completed_last_hour ?? 0;
+        document.getElementById('baseline-time').textContent = (p.baseline_completion_time_seconds ?? 0) + 's';
+        document.getElementById('radix-time').textContent = (p.avg_completion_time_seconds ?? 0) + 's';
+        document.getElementById('improvement-val').textContent = (p.efficiency_pct ?? 0) + '%';
         document.getElementById('last-updated').textContent = data.now;
     } catch (e) {
         console.warn('Auto-refresh failed:', e);

@@ -23,6 +23,9 @@ class SafetyConfig(BaseSettings):
     @field_validator('dry_run')
     @classmethod
     def validate_dry_run(cls, v):
+        from .mode import is_production
+        if is_production():
+            return v  # Allow any value in production
         if not v:
             raise ValueError("DRY_RUN must be True for safety")
         return v
@@ -30,6 +33,11 @@ class SafetyConfig(BaseSettings):
     @field_validator('cost_cap_usd')
     @classmethod
     def validate_cost_cap(cls, v):
+        from .mode import is_production
+        if is_production():
+            if v <= 0:
+                raise ValueError("COST_CAP_USD must be > 0 in production mode")
+            return v
         if v != 0.0:
             raise ValueError("COST_CAP_USD must be 0.00 for safety")
         return v
@@ -37,6 +45,11 @@ class SafetyConfig(BaseSettings):
     @field_validator('max_job_cost_usd')
     @classmethod
     def validate_max_job_cost(cls, v):
+        from .mode import is_production
+        if is_production():
+            if v <= 0:
+                raise ValueError("MAX_JOB_COST_USD must be > 0 in production mode")
+            return v
         if v != 0.0:
             raise ValueError("MAX_JOB_COST_USD must be 0.00 for safety")
         return v
@@ -44,6 +57,9 @@ class SafetyConfig(BaseSettings):
     @field_validator('no_deploy_mode')
     @classmethod
     def validate_no_deploy(cls, v):
+        from .mode import is_production
+        if is_production():
+            return v  # Allow any value in production
         if not v:
             raise ValueError("NO_DEPLOY_MODE must be True for safety")
         return v
@@ -86,6 +102,9 @@ class ExecutionConfig(BaseSettings):
     @field_validator('ray_local_mode')
     @classmethod
     def validate_ray_local(cls, v):
+        from .mode import is_production
+        if is_production():
+            return v  # Allow remote Ray in production
         if not v:
             raise ValueError("Ray must be in local mode for safety")
         return v
@@ -93,6 +112,9 @@ class ExecutionConfig(BaseSettings):
     @field_validator('cpu_cost_per_sec_usd', 'gpu_cost_per_sec_usd')
     @classmethod
     def validate_cost_rates(cls, v):
+        from .mode import is_production
+        if is_production():
+            return v  # Allow real cost rates in production
         if v != 0.0:
             raise ValueError("All cost rates must be 0.00 in dry-run mode")
         return v

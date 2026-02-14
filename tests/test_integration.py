@@ -129,3 +129,48 @@ class TestSafetyIntegration:
         assert config.safety.no_deploy_mode is True
         errors = config.validate()
         assert errors == []
+
+
+@pytest.mark.integration
+class TestProductionModeIntegration:
+    """Test production mode configuration and execution."""
+
+    def test_production_config_loads(self, monkeypatch):
+        from radix_core.config import RadixConfig, reset_config
+        monkeypatch.setenv("RADIX_MODE", "production")
+        reset_config()
+        cfg = RadixConfig.from_env()
+        assert cfg.safety.dry_run is False
+        assert cfg.safety.cost_cap_usd > 0
+        assert cfg.safety.max_job_cost_usd > 0
+        assert cfg.safety.no_deploy_mode is False
+
+    def test_production_dryrun_guard_executes(self, monkeypatch):
+        from radix_core.config import RadixConfig, reset_config, set_config
+        monkeypatch.setenv("RADIX_MODE", "production")
+        reset_config()
+        cfg = RadixConfig.from_env()
+        set_config(cfg)
+
+        @DryRunGuard.protect
+        def compute(x, y):
+            return x + y
+
+        assert compute(3, 4) == 7
+
+    def test_production_cost_estimation(self, monkeypatch):
+        from radix_core.config import RadixConfig, reset_config, set_config
+        monkeypatch.setenv("RADIX_MODE", "production")
+        reset_config()
+        cfg = RadixConfig.from_env()
+        set_config(cfg)
+
+        simulator = CostSimulator()
+        job = Job(
+            name="prod-job",
+            command="echo prod",
+            requirements=ResourceRequirements(cpu_cores=4.0, memory_mb=8192),
+        )
+        estimate = simulator.estimate_job_cost(job)
+        # In production mode with dry_run=False, real cost flows through
+        assert estimate.dry_run_mode is False

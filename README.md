@@ -88,15 +88,30 @@ The dashboard connects to the observer and scheduler-agent services. Configure v
 
 ## Safety Model
 
-radix-core is built with a **safety-first** architecture:
+radix-core uses a **two-mode** safety architecture controlled by `RADIX_MODE`:
 
-- **Dry-run by default** — all operations are simulated; no real resources consumed
+### Development Mode (default)
+- **Dry-run enforced** — all operations are simulated; no real resources consumed
 - **Cost cap at $0.00** — cannot be overridden; prevents accidental spending
 - **No-deploy mode** — deployment operations (kubectl, docker, terraform) are blocked
 - **Local-only execution** — Ray runs in local mode; no external cluster connections
 - **Network guard** — only localhost connections allowed
 
-These constraints are enforced at the configuration level via Pydantic validators that reject unsafe values.
+### Production Mode (`RADIX_MODE=production`)
+- **Real execution** — `DryRunGuard.protect` passes through to the real function
+- **Cost caps required** — `COST_CAP_USD` and `MAX_JOB_COST_USD` must be > 0
+- **Deployment allowed** — kubectl, helm, terraform operations are unblocked
+- **Remote Ray** — can connect to real Ray clusters
+- **Network access** — external hosts allowed (K8s API, cloud services)
+
+```bash
+# Production mode
+export RADIX_MODE=production
+export COST_CAP_USD=100.00
+export MAX_JOB_COST_USD=10.00
+```
+
+Safety constraints are enforced at the configuration level via Pydantic validators that reject invalid values for each mode.
 
 ## CLI Commands
 

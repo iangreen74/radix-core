@@ -92,6 +92,43 @@ class TestRadixConfig:
         assert "$0.00" in s
 
 
+class TestProductionModeConfig:
+    """Tests for configuration in production mode."""
+
+    def test_dry_run_false_allowed_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        cfg = SafetyConfig(dry_run=False, cost_cap_usd=100.0, max_job_cost_usd=10.0, no_deploy_mode=False)
+        assert cfg.dry_run is False
+
+    def test_positive_cost_cap_required_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        with pytest.raises(ValueError, match="COST_CAP_USD must be > 0"):
+            SafetyConfig(dry_run=False, cost_cap_usd=0.0, max_job_cost_usd=10.0)
+
+    def test_positive_max_job_cost_required_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        with pytest.raises(ValueError, match="MAX_JOB_COST_USD must be > 0"):
+            SafetyConfig(dry_run=False, cost_cap_usd=100.0, max_job_cost_usd=0.0)
+
+    def test_no_deploy_false_allowed_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        cfg = SafetyConfig(dry_run=False, cost_cap_usd=100.0, max_job_cost_usd=10.0, no_deploy_mode=False)
+        assert cfg.no_deploy_mode is False
+
+    def test_ray_remote_allowed_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        cfg = ExecutionConfig(ray_local_mode=False)
+        assert cfg.ray_local_mode is False
+
+    def test_production_from_env_defaults(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        cfg = RadixConfig.from_env()
+        assert cfg.safety.dry_run is False
+        assert cfg.safety.cost_cap_usd == 100.0
+        assert cfg.safety.max_job_cost_usd == 10.0
+        assert cfg.safety.no_deploy_mode is False
+
+
 class TestGlobalConfig:
     def test_get_config_returns_default(self):
         cfg = get_config()

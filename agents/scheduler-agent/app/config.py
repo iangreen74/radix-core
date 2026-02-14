@@ -11,14 +11,14 @@ class SchedulerConfig(BaseSettings):
     # Information theory parameters
     lambda_uncertainty: float = Field(default=0.3, description="Uncertainty weight (λ)")
     beta_exploration: float = Field(default=0.7, description="Information gain weight (β)")
-    gamma_interference: float = Field(default=0.0, description="Interference penalty weight (γ)")
+    gamma_interference: float = Field(default=0.5, description="Interference penalty weight (γ)")
     tau_squared: float = Field(default=0.15, description="Observation noise variance (τ²)")
 
     # Exploration control
     exploration_cap: float = Field(default=0.25, description="Maximum exploration ratio")
 
     # Feature flags
-    enable_interference: bool = Field(default=False, description="Enable interference learning")
+    enable_interference: bool = Field(default=True, description="Enable interference learning")
     enable_sinkhorn: bool = Field(default=False, description="Enable Sinkhorn assignment")
     enable_mutation: bool = Field(default=True, description="Enable webhook mutation")
 

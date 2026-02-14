@@ -99,14 +99,65 @@ class MutatingWebhook:
         return features
 
     def get_candidate_gpu_types(self) -> List[str]:
-        """Get available GPU types from cluster (simplified for MVP)."""
-        # In a real implementation, this would query the cluster
+        """Get available GPU types from cluster node labels."""
+        try:
+            from kubernetes import client as k8s_client, config as k8s_config
+            try:
+                k8s_config.load_incluster_config()
+            except Exception:
+                k8s_config.load_kube_config()
+
+            v1 = k8s_client.CoreV1Api()
+            nodes = v1.list_node().items
+            gpu_types = set()
+            for node in nodes:
+                labels = node.metadata.labels or {}
+                # Check common GPU label conventions
+                for key in ("gpu.nvidia.com/class", "nvidia.com/gpu.product"):
+                    if key in labels:
+                        gpu_types.add(labels[key])
+            if gpu_types:
+                return list(gpu_types)
+        except Exception as e:
+            logging.debug(f"Failed to query cluster GPU types: {e}")
+
+        # Fallback to known GPU types
         return ["A100-80GB", "A100-40GB", "L4-24GB", "H100-80GB"]
 
     def extract_colocated_jobs(self, pod_spec: Dict[str, Any]) -> List[str]:
-        """Extract colocated job types from node affinity (simplified)."""
-        # In a real implementation, this would query the target node
-        return []
+        """Query running GPU pods on candidate nodes to find colocated job types."""
+        try:
+            from kubernetes import client as k8s_client, config as k8s_config
+            try:
+                k8s_config.load_incluster_config()
+            except Exception:
+                k8s_config.load_kube_config()
+
+            v1 = k8s_client.CoreV1Api()
+            # Get running GPU pods
+            pods = v1.list_pod_for_all_namespaces(
+                field_selector="status.phase=Running"
+            ).items
+
+            colocated = []
+            for pod in pods:
+                # Check if this pod uses GPUs
+                for container in pod.spec.containers or []:
+                    requests = (container.resources.requests or {}) if container.resources else {}
+                    if any("nvidia.com/gpu" in k for k in requests):
+                        annotations = pod.metadata.annotations or {}
+                        job_type = annotations.get(
+                            "app.kubernetes.io/job-type",
+                            (pod.metadata.labels or {}).get("app.kubernetes.io/job-type", "")
+                        )
+                        if job_type:
+                            colocated.append(job_type)
+                        break
+            return colocated
+
+        except Exception as e:
+            logging.debug(f"Failed to query colocated jobs: {e}")
+            return []
 
     async def call_scheduler(self, job_type: str, features: Dict[str, Any],
                            candidates: List[str], colocated: List[str]) -> Optional[Dict[str, Any]]:

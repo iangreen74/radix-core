@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.0 — 2026-02-13
+
+Production-ready GPU orchestration with real execution, real efficiency measurement, and live dashboard metrics.
+
+### Added
+- **Production Mode**: `RADIX_MODE=production` unlocks real GPU execution, non-zero cost caps, deployment operations, and remote Ray clusters
+- **Mode System**: New `radix_core/mode.py` with `RadixMode` enum (`development` / `production`), `get_mode()`, `is_production()`
+- **Real Execution Path**: `DryRunGuard.protect` now executes the real function when `dry_run=False` in production mode
+- **Observer v2**: Complete rewrite with `EfficiencyTracker` class, pod lifecycle watching, FIFO baseline calculation, and real efficiency measurement
+- **Observer Metrics**: GPU utilization %, throughput (jobs/hr), avg wait time, avg completion time, baseline comparison, efficiency % vs FIFO
+- **Observer Learning Loop**: Completed jobs are reported to scheduler `/v1/observe` for Bayesian model updates
+- **Scheduler Interference**: Enabled by default (`gamma_interference=0.5`, `enable_interference=True`)
+- **Webhook Real Data**: `get_candidate_gpu_types()` queries cluster node labels, `extract_colocated_jobs()` queries running GPU pods
+- **Webhook RBAC**: ClusterRole + ClusterRoleBinding for pods and nodes get/list/watch
+- **Dashboard v2**: Overview page with efficiency %, throughput, avg wait time, GPU utilization, FIFO baseline comparison chart, efficiency timeseries chart
+- **Tests**: 22 new tests — mode tests, production config tests, production safety tests, production integration tests (181 total)
+
+### Changed
+- SafetyConfig validators are mode-aware: development enforces safe defaults, production requires positive cost caps
+- ExecutionConfig allows `ray_local_mode=False` in production
+- NetworkGuard allows external hosts in production
+- CostGuard enforces cost caps in production instead of rejecting all non-zero costs
+- Observer `/v1/preview` response now includes full metrics (efficiency_pct, throughput, utilization, etc.)
+- Dashboard overview shows real metrics instead of toy heuristic
+- `.env.example` documents RADIX_MODE and production configuration
+
+### Fixed
+- Observer Helm deployment now receives SCHEDULER_URL env var for learning loop
+- Helm `mvp.instantPreview.enabled` set to true by default
+
 ## 0.2.0 — 2026-02-13
 
 Dashboard, CI/CD, and developer experience improvements.

@@ -78,7 +78,9 @@ class RayLocalExecutor:
 
         # Safety checks
         if not self.config.execution.ray_local_mode:
-            raise ValueError("Ray must be in local mode for safety")
+            from ..mode import is_production
+            if not is_production():
+                raise ValueError("Ray must be in local mode for safety")
 
         if self.num_gpus > 0 and not getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)):
             logger.warning("GPU allocation requested but CUDA disabled")
@@ -107,9 +109,9 @@ class RayLocalExecutor:
             return
 
         try:
-            # Ray initialization parameters (local only)
+            # Ray initialization parameters
             ray_config = {
-                "local_mode": True,  # CRITICAL: Local mode only
+                "local_mode": self.config.execution.ray_local_mode,
                 "num_cpus": self.num_cpus,
                 "num_gpus": self.num_gpus,
                 "ignore_reinit_error": True,

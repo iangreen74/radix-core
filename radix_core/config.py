@@ -24,6 +24,9 @@ class SafetyConfig(BaseSettings):
     @field_validator('dry_run')
     @classmethod
     def validate_dry_run(cls, v):
+        from .mode import is_production
+        if is_production():
+            return v  # Allow any value in production
         if not v:
             raise ValueError("DRY_RUN must be True for safety")
         return v
@@ -31,6 +34,11 @@ class SafetyConfig(BaseSettings):
     @field_validator('cost_cap_usd')
     @classmethod
     def validate_cost_cap(cls, v):
+        from .mode import is_production
+        if is_production():
+            if v <= 0:
+                raise ValueError("COST_CAP_USD must be > 0 in production mode")
+            return v
         if v != 0.0:
             raise ValueError("COST_CAP_USD must be 0.00 for safety")
         return v
@@ -38,6 +46,11 @@ class SafetyConfig(BaseSettings):
     @field_validator('max_job_cost_usd')
     @classmethod
     def validate_max_job_cost(cls, v):
+        from .mode import is_production
+        if is_production():
+            if v <= 0:
+                raise ValueError("MAX_JOB_COST_USD must be > 0 in production mode")
+            return v
         if v != 0.0:
             raise ValueError("MAX_JOB_COST_USD must be 0.00 for safety")
         return v
@@ -45,6 +58,9 @@ class SafetyConfig(BaseSettings):
     @field_validator('no_deploy_mode')
     @classmethod
     def validate_no_deploy(cls, v):
+        from .mode import is_production
+        if is_production():
+            return v  # Allow any value in production
         if not v:
             raise ValueError("NO_DEPLOY_MODE must be True for safety")
         return v
@@ -79,9 +95,11 @@ class ExecutionConfig:
         if self.enable_gpu and not self._is_local_gpu_safe():
             raise ValueError("GPU usage must be local-only for safety")
 
-        # Safety: Ray must be in local mode
+        # Safety: Ray must be in local mode (unless production)
         if not self.ray_local_mode:
-            raise ValueError("Ray must be in local mode for safety")
+            from .mode import is_production
+            if not is_production():
+                raise ValueError("Ray must be in local mode for safety")
 
         if self.ray_num_gpus > 0 and not self.enable_gpu:
             raise ValueError("Cannot allocate GPUs when GPU is disabled")
@@ -216,12 +234,16 @@ class RadixConfig:
         if env_file:
             cls._load_env_file(env_file)
 
+        # Mode-aware defaults
+        from .mode import is_production
+        prod = is_production()
+
         # Create safety config from environment
         safety = SafetyConfig(
-            dry_run=cls._get_bool_env('DRY_RUN', True),
-            no_deploy_mode=cls._get_bool_env('NO_DEPLOY_MODE', True),
-            cost_cap_usd=cls._get_float_env('COST_CAP_USD', 0.0),
-            max_job_cost_usd=cls._get_float_env('MAX_JOB_COST_USD', 0.0)
+            dry_run=cls._get_bool_env('DRY_RUN', False if prod else True),
+            no_deploy_mode=cls._get_bool_env('NO_DEPLOY_MODE', False if prod else True),
+            cost_cap_usd=cls._get_float_env('COST_CAP_USD', 100.0 if prod else 0.0),
+            max_job_cost_usd=cls._get_float_env('MAX_JOB_COST_USD', 10.0 if prod else 0.0)
         )
 
         # Create execution config from environment

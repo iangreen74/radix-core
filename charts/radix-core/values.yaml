@@ -98,7 +98,7 @@ images:
 
 mvp:
   instantPreview:
-    enabled: false
+    enabled: true
   timeSeries:
     retentionDays: 7
     storage:

@@ -62,6 +62,11 @@ def test_overview_api(client):
     data = r.json()
     assert "preview" in data
     assert "scheduler" in data
+    # Verify new observer response shape
+    p = data["preview"]
+    assert "efficiency_pct" in p
+    assert "gpu_nodes" in p
+    assert "throughput_jobs_per_hour" in p
 
 
 def test_health_api(client):

@@ -48,26 +48,21 @@ class DryRunGuard:
         def wrapper(*args, **kwargs):
             config = get_config()
 
-            # Always enforce dry-run mode for safety
-            if not config.safety.dry_run:
-                raise SafetyViolationError(
-                    "Dry-run mode is disabled",
-                    "Set DRY_RUN=true in environment variables"
-                )
+            if config.safety.dry_run:
+                # Dry-run mode: simulate the operation
+                operation_id = _log_dry_run_operation(func.__name__, args, kwargs)
 
-            # Log the protected operation
-            operation_id = _log_dry_run_operation(func.__name__, args, kwargs)
-
-            try:
-                # Simulate the operation instead of executing it
-                result = _simulate_operation(func, args, kwargs)
-
-                _log_operation_completion(operation_id, success=True, result=result)
-                return result
-
-            except Exception as e:
-                _log_operation_completion(operation_id, success=False, error=str(e))
-                raise
+                try:
+                    result = _simulate_operation(func, args, kwargs)
+                    _log_operation_completion(operation_id, success=True, result=result)
+                    return result
+                except Exception as e:
+                    _log_operation_completion(operation_id, success=False, error=str(e))
+                    raise
+            else:
+                # Production mode: execute the real function
+                logger.info(f"PRODUCTION: Executing {func.__name__}")
+                return func(*args, **kwargs)
 
         # Mark function as protected
         wrapper._is_dry_run_protected = True
@@ -81,28 +76,29 @@ class DryRunGuard:
     @staticmethod
     def verify_safety():
         """Verify that all safety settings are properly configured."""
+        from .mode import is_production
         config = get_config()
 
         violations = []
 
-        # Check dry-run mode
-        if not config.safety.dry_run:
-            violations.append("DRY_RUN must be True")
-
-        # Check cost caps
-        if config.safety.cost_cap_usd != 0.0:
-            violations.append(f"COST_CAP_USD must be 0.00, got {config.safety.cost_cap_usd}")
-
-        if config.safety.max_job_cost_usd != 0.0:
-            violations.append(f"MAX_JOB_COST_USD must be 0.00, got {config.safety.max_job_cost_usd}")
-
-        # Check deployment mode
-        if not config.safety.no_deploy_mode:
-            violations.append("NO_DEPLOY_MODE must be True")
-
-        # Check for dangerous configurations
-        if config.execution.ray_num_gpus > 0 and not config.execution.ray_local_mode:
-            violations.append("Ray GPU usage requires local mode")
+        if is_production():
+            # Production mode: cost caps must be positive (no unlimited spending)
+            if config.safety.cost_cap_usd <= 0:
+                violations.append("COST_CAP_USD must be > 0 in production mode")
+            if config.safety.max_job_cost_usd <= 0:
+                violations.append("MAX_JOB_COST_USD must be > 0 in production mode")
+        else:
+            # Development mode: strict safety enforcement
+            if not config.safety.dry_run:
+                violations.append("DRY_RUN must be True")
+            if config.safety.cost_cap_usd != 0.0:
+                violations.append(f"COST_CAP_USD must be 0.00, got {config.safety.cost_cap_usd}")
+            if config.safety.max_job_cost_usd != 0.0:
+                violations.append(f"MAX_JOB_COST_USD must be 0.00, got {config.safety.max_job_cost_usd}")
+            if not config.safety.no_deploy_mode:
+                violations.append("NO_DEPLOY_MODE must be True")
+            if config.execution.ray_num_gpus > 0 and not config.execution.ray_local_mode:
+                violations.append("Ray GPU usage requires local mode")
 
         if violations:
             raise SafetyViolationError(
@@ -147,16 +143,16 @@ class CostGuard:
                 message="All costs must be $0.00 in dry-run mode"
             )
 
-        # Check against cost caps
-        if estimated_cost > config.safety.cost_cap_usd:
-            raise CostCapExceededError(
-                estimated_cost, config.safety.cost_cap_usd, operation
-            )
-
-        if estimated_cost > config.safety.max_job_cost_usd:
-            raise CostCapExceededError(
-                estimated_cost, config.safety.max_job_cost_usd, operation
-            )
+        # In production mode, enforce cost caps
+        if not config.safety.dry_run:
+            if estimated_cost > config.safety.cost_cap_usd:
+                raise CostCapExceededError(
+                    estimated_cost, config.safety.cost_cap_usd, operation
+                )
+            if estimated_cost > config.safety.max_job_cost_usd:
+                raise CostCapExceededError(
+                    estimated_cost, config.safety.max_job_cost_usd, operation
+                )
 
     @staticmethod
     def protect_with_cost_check(estimated_cost: float, operation: str = "operation"):
@@ -199,7 +195,7 @@ class DeploymentGuard:
         config = get_config()
 
         if not config.safety.no_deploy_mode:
-            return  # Deployment mode is enabled (should never happen)
+            return  # Deployment operations are allowed
 
         operation_lower = operation_name.lower()
 
@@ -228,15 +224,21 @@ class NetworkGuard:
     @staticmethod
     def check_network_operation(host: str, operation: str = "network operation"):
         """
-        Check if a network operation is safe (local only).
+        Check if a network operation is safe.
+
+        In development mode: only localhost allowed.
+        In production mode: all network operations allowed (needed for K8s API, etc.).
 
         Args:
             host: Target host for the operation
             operation: Description of the operation
 
         Raises:
-            SafetyViolationError: If operation targets external hosts
+            SafetyViolationError: If operation targets external hosts in development mode
         """
+        from .mode import is_production
+        if is_production():
+            return  # All network operations allowed in production
         if host not in NetworkGuard.ALLOWED_LOCALHOST:
             raise SafetyViolationError(
                 f"External network operation to {host} is forbidden",

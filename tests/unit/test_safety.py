@@ -74,6 +74,68 @@ class TestNetworkGuard:
             NetworkGuard.check_network_operation("example.com")
 
 
+class TestProductionModeSafety:
+    """Tests for safety guards in production mode."""
+
+    def test_dryrun_guard_executes_real_function_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        from radix_core.config import reset_config, RadixConfig, set_config
+        reset_config()
+        cfg = RadixConfig.from_env()
+        set_config(cfg)
+
+        @DryRunGuard.protect
+        def real_function():
+            return "real_result"
+
+        result = real_function()
+        assert result == "real_result"
+
+    def test_verify_safety_production_requires_cost_caps(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        from radix_core.config import reset_config, RadixConfig, set_config
+        reset_config()
+
+        # Default production config has positive cost caps, should pass
+        cfg = RadixConfig.from_env()
+        set_config(cfg)
+        DryRunGuard.verify_safety()  # Should not raise
+
+    def test_cost_guard_allows_nonzero_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        from radix_core.config import reset_config, RadixConfig, set_config
+        reset_config()
+        cfg = RadixConfig.from_env()
+        set_config(cfg)
+
+        # Non-zero cost within cap should pass
+        CostGuard.check_cost(5.0, "test_op")
+
+    def test_cost_guard_enforces_cap_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        from radix_core.config import reset_config, RadixConfig, set_config
+        reset_config()
+        cfg = RadixConfig.from_env()
+        set_config(cfg)
+
+        # Cost exceeding cap should fail
+        with pytest.raises(CostCapExceededError):
+            CostGuard.check_cost(999.0, "expensive_op")
+
+    def test_network_guard_allows_external_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        NetworkGuard.check_network_operation("example.com")  # Should not raise
+
+    def test_deployment_guard_allows_deploy_in_production(self, monkeypatch):
+        monkeypatch.setenv("RADIX_MODE", "production")
+        from radix_core.config import reset_config, RadixConfig, set_config
+        reset_config()
+        cfg = RadixConfig.from_env()
+        set_config(cfg)
+
+        DeploymentGuard.check_operation("deploy_model")  # Should not raise
+
+
 class TestCostSimulator:
     def test_estimate_job_cost_zero_in_dry_run(self, sample_job):
         sim = CostSimulator()

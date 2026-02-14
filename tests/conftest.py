@@ -6,8 +6,9 @@ from radix_core.types import Job, ResourceRequirements
 
 
 @pytest.fixture(autouse=True)
-def _reset_global_config():
-    """Reset global config before and after every test."""
+def _reset_global_config(monkeypatch):
+    """Reset global config and ensure development mode for all tests."""
+    monkeypatch.delenv("RADIX_MODE", raising=False)
     reset_config()
     yield
     reset_config()
