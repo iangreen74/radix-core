@@ -5,27 +5,29 @@ Provides comprehensive metrics collection, aggregation, and analysis
 for GPU orchestration research with real-time monitoring capabilities.
 """
 
-import time
-import threading
+import json
 import queue
 import statistics
-import json
-import psutil
+import threading
+import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, asdict, field
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
-from contextlib import contextmanager
+
 import numpy as np
+import psutil
 
 from .config import get_config
-from .logging import get_logger, CorrelationContext
+from .logging import CorrelationContext, get_logger
 
 
 @dataclass
 class MetricPoint:
     """Individual metric measurement point."""
+
     timestamp: datetime
     name: str
     value: float
@@ -36,6 +38,7 @@ class MetricPoint:
 @dataclass
 class AggregatedMetric:
     """Aggregated metric with statistical information."""
+
     name: str
     count: int
     sum: float
@@ -53,6 +56,7 @@ class AggregatedMetric:
 @dataclass
 class SystemMetrics:
     """System resource metrics snapshot."""
+
     timestamp: datetime
     cpu_percent: float
     cpu_count: int
@@ -73,6 +77,7 @@ class SystemMetrics:
 @dataclass
 class JobMetrics:
     """Job execution metrics."""
+
     job_id: str
     job_type: str
     executor_type: str
@@ -129,22 +134,30 @@ class MetricsCollector:
         # Start collection threads
         self._collection_thread = threading.Thread(target=self._collection_loop, daemon=True)
         self._aggregation_thread = threading.Thread(target=self._aggregation_loop, daemon=True)
-        self._system_monitor_thread = threading.Thread(target=self._system_monitor_loop, daemon=True)
+        self._system_monitor_thread = threading.Thread(
+            target=self._system_monitor_loop, daemon=True
+        )
 
         self._collection_thread.start()
         self._aggregation_thread.start()
         self._system_monitor_thread.start()
 
-        self.logger.info("Metrics collection started",
-                        collection_interval=self.collection_interval,
-                        max_points=self.max_points)
+        self.logger.info(
+            "Metrics collection started",
+            collection_interval=self.collection_interval,
+            max_points=self.max_points,
+        )
 
     def stop_collection(self):
         """Stop metrics collection."""
         self._collecting = False
 
         # Wait for threads to finish
-        for thread in [self._collection_thread, self._aggregation_thread, self._system_monitor_thread]:
+        for thread in [
+            self._collection_thread,
+            self._aggregation_thread,
+            self._system_monitor_thread,
+        ]:
             if thread and thread.is_alive():
                 thread.join(timeout=5.0)
 
@@ -157,7 +170,7 @@ class MetricsCollector:
             name=name,
             value=value,
             labels=labels or {},
-            correlation_id=CorrelationContext.get_correlation_id()
+            correlation_id=CorrelationContext.get_correlation_id(),
         )
 
         try:
@@ -195,11 +208,13 @@ class MetricsCollector:
 
             # Record timing metric
             timing_labels = (labels or {}).copy()
-            timing_labels.update({
-                'operation': operation_name,
-                'success': str(success),
-                'correlation_id': correlation_id
-            })
+            timing_labels.update(
+                {
+                    "operation": operation_name,
+                    "success": str(success),
+                    "correlation_id": correlation_id,
+                }
+            )
 
             self.record_histogram("operation.duration_seconds", duration, timing_labels)
 
@@ -207,14 +222,16 @@ class MetricsCollector:
             with self._lock:
                 self._operation_timers[operation_name].append(duration)
 
-    def start_job_metrics(self, job_id: str, job_type: str = "unknown", executor_type: str = "unknown") -> JobMetrics:
+    def start_job_metrics(
+        self, job_id: str, job_type: str = "unknown", executor_type: str = "unknown"
+    ) -> JobMetrics:
         """Start tracking metrics for a job."""
         job_metrics = JobMetrics(
             job_id=job_id,
             job_type=job_type,
             executor_type=executor_type,
             start_time=datetime.utcnow(),
-            correlation_id=CorrelationContext.get_correlation_id()
+            correlation_id=CorrelationContext.get_correlation_id(),
         )
 
         with self._lock:
@@ -232,7 +249,9 @@ class MetricsCollector:
 
             job_metrics = self._job_metrics[job_id]
             job_metrics.end_time = datetime.utcnow()
-            job_metrics.duration_seconds = (job_metrics.end_time - job_metrics.start_time).total_seconds()
+            job_metrics.duration_seconds = (
+                job_metrics.end_time - job_metrics.start_time
+            ).total_seconds()
             job_metrics.success = success
             job_metrics.exit_code = exit_code
 
@@ -243,10 +262,10 @@ class MetricsCollector:
 
         # Record job completion metrics
         job_labels = {
-            'job_id': job_id,
-            'job_type': job_metrics.job_type,
-            'executor_type': job_metrics.executor_type,
-            'success': str(success)
+            "job_id": job_id,
+            "job_type": job_metrics.job_type,
+            "executor_type": job_metrics.executor_type,
+            "success": str(success),
         }
 
         self.record_histogram("job.duration_seconds", job_metrics.duration_seconds, job_labels)
@@ -275,7 +294,7 @@ class MetricsCollector:
             if not values:
                 continue
 
-            name, labels_json = key.split(':', 1)
+            name, labels_json = key.split(":", 1)
             labels = json.loads(labels_json)
 
             # Calculate statistics
@@ -292,7 +311,7 @@ class MetricsCollector:
                 p95=float(np.percentile(values_array, 95)),
                 p99=float(np.percentile(values_array, 99)),
                 labels=labels,
-                time_window=time_window
+                time_window=time_window,
             )
 
         return result
@@ -303,19 +322,19 @@ class MetricsCollector:
             config = get_config()
             results_dir = Path(config.research.results_dir)
             results_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             filepath = results_dir / f"metrics_{timestamp}.{format}"
 
         export_data = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'collection_interval': self.collection_interval,
-            'aggregated_metrics': {k: asdict(v) for k, v in self.get_aggregated_metrics().items()},
-            'job_metrics': {k: asdict(v) for k, v in self._job_metrics.items()},
-            'operation_statistics': self.get_operation_statistics()
+            "timestamp": datetime.utcnow().isoformat(),
+            "collection_interval": self.collection_interval,
+            "aggregated_metrics": {k: asdict(v) for k, v in self.get_aggregated_metrics().items()},
+            "job_metrics": {k: asdict(v) for k, v in self._job_metrics.items()},
+            "operation_statistics": self.get_operation_statistics(),
         }
 
         try:
-            with open(filepath, 'w') as f:
+            with open(filepath, "w") as f:
                 if format == "json":
                     json.dump(export_data, f, indent=2, default=str)
                 else:
@@ -336,12 +355,12 @@ class MetricsCollector:
                 if timings:
                     timings_list = list(timings)
                     result[op_name] = {
-                        'count': len(timings_list),
-                        'mean': statistics.mean(timings_list),
-                        'median': statistics.median(timings_list),
-                        'std_dev': statistics.stdev(timings_list) if len(timings_list) > 1 else 0.0,
-                        'min': min(timings_list),
-                        'max': max(timings_list)
+                        "count": len(timings_list),
+                        "mean": statistics.mean(timings_list),
+                        "median": statistics.median(timings_list),
+                        "std_dev": statistics.stdev(timings_list) if len(timings_list) > 1 else 0.0,
+                        "min": min(timings_list),
+                        "max": max(timings_list),
                     }
             return result
 
@@ -424,8 +443,10 @@ class MetricsCollector:
                     network_bytes_recv=network_recv,
                     process_count=process_count,
                     thread_count=current_process.num_threads(),
-                    file_descriptors=current_process.num_fds() if hasattr(current_process, 'num_fds') else 0,
-                    correlation_id=CorrelationContext.get_correlation_id()
+                    file_descriptors=(
+                        current_process.num_fds() if hasattr(current_process, "num_fds") else 0
+                    ),
+                    correlation_id=CorrelationContext.get_correlation_id(),
                 )
 
                 with self._lock:
@@ -457,8 +478,9 @@ def get_metrics_collector() -> MetricsCollector:
     if _metrics_collector is None:
         config = get_config()
         _metrics_collector = MetricsCollector(
-            collection_interval=getattr(config.logging, 'metrics_interval', 60) / 60.0,  # Convert to seconds
-            max_points=10000  # Default value
+            collection_interval=getattr(config.logging, "metrics_interval", 60)
+            / 60.0,  # Convert to seconds
+            max_points=10000,  # Default value
         )
         _metrics_collector.start_collection()
     return _metrics_collector
@@ -485,7 +507,9 @@ def time_operation(operation_name: str, labels: Dict[str, str] = None):
     return get_metrics_collector().time_operation(operation_name, labels)
 
 
-def start_job_metrics(job_id: str, job_type: str = "unknown", executor_type: str = "unknown") -> JobMetrics:
+def start_job_metrics(
+    job_id: str, job_type: str = "unknown", executor_type: str = "unknown"
+) -> JobMetrics:
     """Convenience function to start job metrics tracking."""
     return get_metrics_collector().start_job_metrics(job_id, job_type, executor_type)
 

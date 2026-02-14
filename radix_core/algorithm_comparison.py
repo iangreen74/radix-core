@@ -30,17 +30,18 @@ The framework measures performance across multiple dimensions:
 - Fault tolerance
 """
 
+import statistics
 import time
-import numpy as np
-from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-import statistics
+from typing import Any, Dict, List, Tuple
 
-from .types import Job, ResourceRequirements
-from .quantum_orchestration import QuantumEntanglementOrchestrator
+import numpy as np
+
 from .information_theory import InformationTheoryOrchestrator
 from .logging import get_logger
+from .quantum_orchestration import QuantumEntanglementOrchestrator
+from .types import Job, ResourceRequirements
 from .utils.timers import time_operation
 
 logger = get_logger(__name__)
@@ -48,6 +49,7 @@ logger = get_logger(__name__)
 
 class AlgorithmType(Enum):
     """Types of orchestration algorithms."""
+
     CLASSICAL_ROUND_ROBIN = "classical_round_robin"
     CLASSICAL_SJF = "classical_shortest_job_first"
     CLASSICAL_BIN_PACKING = "classical_bin_packing"
@@ -98,37 +100,37 @@ class BenchmarkMetrics:
     def to_dict(self) -> Dict[str, Any]:
         """Convert metrics to dictionary for serialization."""
         return {
-            'throughput': {
-                'jobs_per_second': self.jobs_per_second,
-                'total_execution_time': self.total_execution_time,
-                'scheduling_overhead': self.scheduling_overhead
+            "throughput": {
+                "jobs_per_second": self.jobs_per_second,
+                "total_execution_time": self.total_execution_time,
+                "scheduling_overhead": self.scheduling_overhead,
             },
-            'resource_utilization': {
-                'cpu_utilization': self.cpu_utilization,
-                'memory_utilization': self.memory_utilization,
-                'gpu_utilization': self.gpu_utilization,
-                'resource_efficiency': self.resource_efficiency
+            "resource_utilization": {
+                "cpu_utilization": self.cpu_utilization,
+                "memory_utilization": self.memory_utilization,
+                "gpu_utilization": self.gpu_utilization,
+                "resource_efficiency": self.resource_efficiency,
             },
-            'latency': {
-                'mean_latency': self.mean_latency,
-                'median_latency': self.median_latency,
-                'p95_latency': self.p95_latency,
-                'p99_latency': self.p99_latency
+            "latency": {
+                "mean_latency": self.mean_latency,
+                "median_latency": self.median_latency,
+                "p95_latency": self.p95_latency,
+                "p99_latency": self.p99_latency,
             },
-            'optimization': {
-                'fairness_index': self.fairness_index,
-                'load_balance_score': self.load_balance_score,
-                'optimization_score': self.optimization_score
+            "optimization": {
+                "fairness_index": self.fairness_index,
+                "load_balance_score": self.load_balance_score,
+                "optimization_score": self.optimization_score,
             },
-            'efficiency': {
-                'cost_efficiency': self.cost_efficiency,
-                'energy_efficiency': self.energy_efficiency
+            "efficiency": {
+                "cost_efficiency": self.cost_efficiency,
+                "energy_efficiency": self.energy_efficiency,
             },
-            'fault_tolerance': {
-                'failure_recovery_time': self.failure_recovery_time,
-                'error_correction_rate': self.error_correction_rate
+            "fault_tolerance": {
+                "failure_recovery_time": self.failure_recovery_time,
+                "error_correction_rate": self.error_correction_rate,
             },
-            'algorithm_specific': self.algorithm_specific
+            "algorithm_specific": self.algorithm_specific,
         }
 
 
@@ -184,14 +186,18 @@ class ClassicalOrchestrators:
         resource_capacities = {r: 100.0 for r in resources}  # Simulated capacity
 
         # Sort jobs by resource requirements (largest first)
-        sorted_jobs = sorted(jobs, key=lambda j: j.requirements.cpu_cores + j.requirements.memory_mb/1000, reverse=True)
+        sorted_jobs = sorted(
+            jobs,
+            key=lambda j: j.requirements.cpu_cores + j.requirements.memory_mb / 1000,
+            reverse=True,
+        )
 
         for job in sorted_jobs:
-            job_size = job.requirements.cpu_cores + job.requirements.memory_mb/1000
+            job_size = job.requirements.cpu_cores + job.requirements.memory_mb / 1000
 
             # Find best-fit resource
             best_resource = None
-            best_fit = float('inf')
+            best_fit = float("inf")
 
             for resource in resources:
                 if resource_capacities[resource] >= job_size:
@@ -205,9 +211,13 @@ class ClassicalOrchestrators:
                 resource_capacities[best_resource] -= job_size
             else:
                 # If no fit, assign to resource with most capacity
-                best_resource = max(resource_capacities.keys(), key=lambda r: resource_capacities[r])
+                best_resource = max(
+                    resource_capacities.keys(), key=lambda r: resource_capacities[r]
+                )
                 allocations.append((job, best_resource))
-                resource_capacities[best_resource] = max(0, resource_capacities[best_resource] - job_size)
+                resource_capacities[best_resource] = max(
+                    0, resource_capacities[best_resource] - job_size
+                )
 
         return allocations
 
@@ -221,18 +231,15 @@ class ClassicalOrchestrators:
 
         resource_scores = {}
         for resource in resources:
-            resource_scores[resource] = {
-                'load': 0.0,
-                'suitability': 0.0
-            }
+            resource_scores[resource] = {"load": 0.0, "suitability": 0.0}
 
         for job in sorted_jobs:
             best_resource = None
-            best_score = -float('inf')
+            best_score = -float("inf")
 
             for resource in resources:
                 # Calculate resource score based on current load and job fit
-                load_penalty = resource_scores[resource]['load'] * 0.5
+                load_penalty = resource_scores[resource]["load"] * 0.5
                 priority_bonus = job.priority * 0.3
                 resource_fit = min(job.requirements.cpu_cores / 32.0, 1.0) * 0.2
 
@@ -244,7 +251,7 @@ class ClassicalOrchestrators:
 
             if best_resource:
                 allocations.append((job, best_resource))
-                resource_scores[best_resource]['load'] += job.requirements.cpu_cores / 32.0
+                resource_scores[best_resource]["load"] += job.requirements.cpu_cores / 32.0
 
         return allocations
 
@@ -265,9 +272,9 @@ class AlgorithmBenchmark:
         self.warmup_jobs = 50
         self.measurement_jobs = 200
 
-    def create_benchmark_workload(self,
-                                workload_type: str = "mixed",
-                                job_count: int = 200) -> List[Job]:
+    def create_benchmark_workload(
+        self, workload_type: str = "mixed", job_count: int = 200
+    ) -> List[Job]:
         """Create representative workload for benchmarking."""
 
         jobs = []
@@ -280,10 +287,9 @@ class AlgorithmBenchmark:
                     name=f"compute_job_{i}",
                     command="python compute_intensive.py",
                     requirements=ResourceRequirements(
-                        cpu_cores=np.random.randint(8, 32),
-                        memory_mb=np.random.randint(4000, 16000)
+                        cpu_cores=np.random.randint(8, 32), memory_mb=np.random.randint(4000, 16000)
                     ),
-                    priority=np.random.randint(1, 10)
+                    priority=np.random.randint(1, 10),
                 )
                 jobs.append(job)
 
@@ -296,9 +302,9 @@ class AlgorithmBenchmark:
                     command="python memory_intensive.py",
                     requirements=ResourceRequirements(
                         cpu_cores=np.random.randint(2, 16),
-                        memory_mb=np.random.randint(16000, 64000)
+                        memory_mb=np.random.randint(16000, 64000),
                     ),
-                    priority=np.random.randint(1, 10)
+                    priority=np.random.randint(1, 10),
                 )
                 jobs.append(job)
 
@@ -310,11 +316,10 @@ class AlgorithmBenchmark:
                     name=f"ml_training_{i}",
                     command="python train_model.py",
                     requirements=ResourceRequirements(
-                        cpu_cores=np.random.randint(4, 16),
-                        memory_mb=np.random.randint(8000, 32000)
+                        cpu_cores=np.random.randint(4, 16), memory_mb=np.random.randint(8000, 32000)
                     ),
                     priority=np.random.randint(3, 8),
-                    metadata={"workload_type": "ml_training"}
+                    metadata={"workload_type": "ml_training"},
                 )
                 jobs.append(job)
 
@@ -340,28 +345,26 @@ class AlgorithmBenchmark:
                     job_id=f"{job_type}_{i}",
                     name=f"{job_type}_job_{i}",
                     command=f"python {job_type}_task.py",
-                    requirements=ResourceRequirements(
-                        cpu_cores=cpu_cores,
-                        memory_mb=memory_mb
-                    ),
+                    requirements=ResourceRequirements(cpu_cores=cpu_cores, memory_mb=memory_mb),
                     priority=np.random.randint(1, 10),
-                    metadata={"workload_type": job_type}
+                    metadata={"workload_type": job_type},
                 )
                 jobs.append(job)
 
         return jobs
 
-    def benchmark_algorithm(self,
-                          algorithm_type: AlgorithmType,
-                          workload: List[Job],
-                          iterations: int = 5) -> BenchmarkMetrics:
+    def benchmark_algorithm(
+        self, algorithm_type: AlgorithmType, workload: List[Job], iterations: int = 5
+    ) -> BenchmarkMetrics:
         """Benchmark a specific algorithm with given workload."""
 
         all_metrics = []
 
         for iteration in range(iterations):
-            logger.info(f"Running benchmark iteration {iteration + 1}/{iterations}",
-                       algorithm=algorithm_type.value)
+            logger.info(
+                f"Running benchmark iteration {iteration + 1}/{iterations}",
+                algorithm=algorithm_type.value,
+            )
 
             metrics = self._single_benchmark_run(algorithm_type, workload.copy())
             all_metrics.append(metrics)
@@ -369,9 +372,9 @@ class AlgorithmBenchmark:
         # Aggregate metrics across iterations
         return self._aggregate_metrics(all_metrics)
 
-    def _single_benchmark_run(self,
-                            algorithm_type: AlgorithmType,
-                            workload: List[Job]) -> BenchmarkMetrics:
+    def _single_benchmark_run(
+        self, algorithm_type: AlgorithmType, workload: List[Job]
+    ) -> BenchmarkMetrics:
         """Run single benchmark iteration."""
 
         start_time = time.time()
@@ -379,16 +382,24 @@ class AlgorithmBenchmark:
         # Schedule jobs using specified algorithm
         with time_operation(f"benchmark_{algorithm_type.value}"):
             if algorithm_type == AlgorithmType.CLASSICAL_ROUND_ROBIN:
-                allocations = self.classical_orchestrators.round_robin_schedule(workload, self.resources)
+                allocations = self.classical_orchestrators.round_robin_schedule(
+                    workload, self.resources
+                )
 
             elif algorithm_type == AlgorithmType.CLASSICAL_SJF:
-                allocations = self.classical_orchestrators.shortest_job_first(workload, self.resources)
+                allocations = self.classical_orchestrators.shortest_job_first(
+                    workload, self.resources
+                )
 
             elif algorithm_type == AlgorithmType.CLASSICAL_BIN_PACKING:
-                allocations = self.classical_orchestrators.bin_packing_schedule(workload, self.resources)
+                allocations = self.classical_orchestrators.bin_packing_schedule(
+                    workload, self.resources
+                )
 
             elif algorithm_type == AlgorithmType.CLASSICAL_KUBERNETES:
-                allocations = self.classical_orchestrators.kubernetes_style_schedule(workload, self.resources)
+                allocations = self.classical_orchestrators.kubernetes_style_schedule(
+                    workload, self.resources
+                )
 
             elif algorithm_type == AlgorithmType.INFORMATION_THEORY:
                 allocations = [(job, "gpu_cluster_0") for job in workload]  # Placeholder
@@ -408,10 +419,12 @@ class AlgorithmBenchmark:
 
         return metrics
 
-    def _measure_execution_metrics(self,
-                                 allocations: List[Tuple[Job, str]],
-                                 scheduling_time: float,
-                                 algorithm_type: AlgorithmType) -> BenchmarkMetrics:
+    def _measure_execution_metrics(
+        self,
+        allocations: List[Tuple[Job, str]],
+        scheduling_time: float,
+        algorithm_type: AlgorithmType,
+    ) -> BenchmarkMetrics:
         """Measure execution metrics for given allocations."""
 
         # Simulate job execution times and resource usage
@@ -447,7 +460,9 @@ class AlgorithmBenchmark:
         utilizations = list(resource_utilization.values())
         if utilizations:
             metrics.cpu_utilization = statistics.mean(utilizations) / 32.0  # Normalize by max CPU
-            metrics.resource_efficiency = 1.0 - (statistics.stdev(utilizations) / max(statistics.mean(utilizations), 1))
+            metrics.resource_efficiency = 1.0 - (
+                statistics.stdev(utilizations) / max(statistics.mean(utilizations), 1)
+            )
 
         # Fairness (Jain's fairness index)
         if utilizations:
@@ -473,9 +488,9 @@ class AlgorithmBenchmark:
 
         # Optimization score (composite)
         metrics.optimization_score = (
-            metrics.fairness_index * 0.3 +
-            metrics.load_balance_score * 0.3 +
-            metrics.resource_efficiency * 0.4
+            metrics.fairness_index * 0.3
+            + metrics.load_balance_score * 0.3
+            + metrics.resource_efficiency * 0.4
         )
 
         return metrics
@@ -490,12 +505,18 @@ class AlgorithmBenchmark:
 
         # Aggregate each metric field
         aggregated.jobs_per_second = statistics.mean(m.jobs_per_second for m in metrics_list)
-        aggregated.total_execution_time = statistics.mean(m.total_execution_time for m in metrics_list)
-        aggregated.scheduling_overhead = statistics.mean(m.scheduling_overhead for m in metrics_list)
+        aggregated.total_execution_time = statistics.mean(
+            m.total_execution_time for m in metrics_list
+        )
+        aggregated.scheduling_overhead = statistics.mean(
+            m.scheduling_overhead for m in metrics_list
+        )
 
         aggregated.cpu_utilization = statistics.mean(m.cpu_utilization for m in metrics_list)
         aggregated.memory_utilization = statistics.mean(m.memory_utilization for m in metrics_list)
-        aggregated.resource_efficiency = statistics.mean(m.resource_efficiency for m in metrics_list)
+        aggregated.resource_efficiency = statistics.mean(
+            m.resource_efficiency for m in metrics_list
+        )
 
         aggregated.mean_latency = statistics.mean(m.mean_latency for m in metrics_list)
         aggregated.median_latency = statistics.mean(m.median_latency for m in metrics_list)
@@ -516,10 +537,12 @@ class AlgorithmBenchmark:
 
         return aggregated
 
-    def compare_algorithms(self,
-                         algorithms: List[AlgorithmType],
-                         workload_types: List[str] = None,
-                         job_counts: List[int] = None) -> Dict[str, ComparisonResult]:
+    def compare_algorithms(
+        self,
+        algorithms: List[AlgorithmType],
+        workload_types: List[str] = None,
+        job_counts: List[int] = None,
+    ) -> Dict[str, ComparisonResult]:
         """
         Comprehensive comparison of multiple algorithms across different workloads.
 
@@ -537,9 +560,11 @@ class AlgorithmBenchmark:
             for job_count in job_counts:
                 test_name = f"{workload_type}_{job_count}_jobs"
 
-                logger.info("Running algorithm comparison",
-                           test_name=test_name,
-                           algorithms=[a.value for a in algorithms])
+                logger.info(
+                    "Running algorithm comparison",
+                    test_name=test_name,
+                    algorithms=[a.value for a in algorithms],
+                )
 
                 # Create workload
                 workload = self.create_benchmark_workload(workload_type, job_count)
@@ -556,57 +581,57 @@ class AlgorithmBenchmark:
 
         return results
 
-    def _analyze_comparison_results(self,
-                                  algorithm_results: Dict[AlgorithmType, BenchmarkMetrics],
-                                  test_name: str) -> Dict[str, Any]:
+    def _analyze_comparison_results(
+        self, algorithm_results: Dict[AlgorithmType, BenchmarkMetrics], test_name: str
+    ) -> Dict[str, Any]:
         """Analyze comparison results and provide recommendations."""
 
         analysis = {
-            'test_name': test_name,
-            'algorithms': {},
-            'rankings': {},
-            'recommendations': {},
-            'statistical_analysis': {}
+            "test_name": test_name,
+            "algorithms": {},
+            "rankings": {},
+            "recommendations": {},
+            "statistical_analysis": {},
         }
 
         # Store individual algorithm results
         for algorithm, metrics in algorithm_results.items():
-            analysis['algorithms'][algorithm.value] = metrics.to_dict()
+            analysis["algorithms"][algorithm.value] = metrics.to_dict()
 
         # Calculate rankings for key metrics
         ranking_metrics = [
-            'jobs_per_second', 'resource_efficiency', 'fairness_index',
-            'optimization_score', 'cost_efficiency'
+            "jobs_per_second",
+            "resource_efficiency",
+            "fairness_index",
+            "optimization_score",
+            "cost_efficiency",
         ]
 
         for metric in ranking_metrics:
             # Sort algorithms by metric performance
             sorted_algs = sorted(
-                algorithm_results.items(),
-                key=lambda x: getattr(x[1], metric),
-                reverse=True
+                algorithm_results.items(), key=lambda x: getattr(x[1], metric), reverse=True
             )
 
-            analysis['rankings'][metric] = [
-                {
-                    'algorithm': alg.value,
-                    'value': getattr(metrics, metric),
-                    'rank': i + 1
-                }
+            analysis["rankings"][metric] = [
+                {"algorithm": alg.value, "value": getattr(metrics, metric), "rank": i + 1}
                 for i, (alg, metrics) in enumerate(sorted_algs)
             ]
 
         # Overall recommendation
         best_overall = self._calculate_overall_winner(algorithm_results)
-        analysis['recommendations']['best_overall'] = best_overall
+        analysis["recommendations"]["best_overall"] = best_overall
 
         # Specific use case recommendations
-        analysis['recommendations']['use_cases'] = self._generate_use_case_recommendations(algorithm_results)
+        analysis["recommendations"]["use_cases"] = self._generate_use_case_recommendations(
+            algorithm_results
+        )
 
         return analysis
 
-    def _calculate_overall_winner(self,
-                                algorithm_results: Dict[AlgorithmType, BenchmarkMetrics]) -> Dict[str, Any]:
+    def _calculate_overall_winner(
+        self, algorithm_results: Dict[AlgorithmType, BenchmarkMetrics]
+    ) -> Dict[str, Any]:
         """Calculate overall best performing algorithm."""
 
         # Composite score weighing different factors
@@ -615,60 +640,62 @@ class AlgorithmBenchmark:
         for algorithm, metrics in algorithm_results.items():
             # Weighted composite score
             score = (
-                metrics.jobs_per_second * 0.2 +
-                metrics.resource_efficiency * 0.25 +
-                metrics.fairness_index * 0.2 +
-                metrics.optimization_score * 0.2 +
-                metrics.cost_efficiency * 0.15
+                metrics.jobs_per_second * 0.2
+                + metrics.resource_efficiency * 0.25
+                + metrics.fairness_index * 0.2
+                + metrics.optimization_score * 0.2
+                + metrics.cost_efficiency * 0.15
             )
 
-            scores[algorithm] = {
-                'composite_score': score,
-                'metrics': metrics
-            }
+            scores[algorithm] = {"composite_score": score, "metrics": metrics}
 
         # Find best performing algorithm
-        best_algorithm = max(scores.keys(), key=lambda a: scores[a]['composite_score'])
+        best_algorithm = max(scores.keys(), key=lambda a: scores[a]["composite_score"])
 
         return {
-            'algorithm': best_algorithm.value,
-            'composite_score': scores[best_algorithm]['composite_score'],
-            'confidence': 0.85,  # Placeholder - would calculate from statistical analysis
-            'improvement_over_baseline': self._calculate_improvement(scores, best_algorithm)
+            "algorithm": best_algorithm.value,
+            "composite_score": scores[best_algorithm]["composite_score"],
+            "confidence": 0.85,  # Placeholder - would calculate from statistical analysis
+            "improvement_over_baseline": self._calculate_improvement(scores, best_algorithm),
         }
 
-    def _calculate_improvement(self, scores: Dict[AlgorithmType, Dict], best_algorithm: AlgorithmType) -> float:
+    def _calculate_improvement(
+        self, scores: Dict[AlgorithmType, Dict], best_algorithm: AlgorithmType
+    ) -> float:
         """Calculate improvement over baseline (round robin)."""
 
-        baseline_score = scores.get(AlgorithmType.CLASSICAL_ROUND_ROBIN, {}).get('composite_score', 0)
-        best_score = scores[best_algorithm]['composite_score']
+        baseline_score = scores.get(AlgorithmType.CLASSICAL_ROUND_ROBIN, {}).get(
+            "composite_score", 0
+        )
+        best_score = scores[best_algorithm]["composite_score"]
 
         if baseline_score > 0:
             return ((best_score - baseline_score) / baseline_score) * 100
         else:
             return 0.0
 
-    def _generate_use_case_recommendations(self,
-                                         algorithm_results: Dict[AlgorithmType, BenchmarkMetrics]) -> Dict[str, str]:
+    def _generate_use_case_recommendations(
+        self, algorithm_results: Dict[AlgorithmType, BenchmarkMetrics]
+    ) -> Dict[str, str]:
         """Generate specific use case recommendations."""
 
         recommendations = {}
 
         # Best for throughput
         best_throughput = max(algorithm_results.items(), key=lambda x: x[1].jobs_per_second)
-        recommendations['high_throughput'] = best_throughput[0].value
+        recommendations["high_throughput"] = best_throughput[0].value
 
         # Best for resource efficiency
         best_efficiency = max(algorithm_results.items(), key=lambda x: x[1].resource_efficiency)
-        recommendations['resource_efficiency'] = best_efficiency[0].value
+        recommendations["resource_efficiency"] = best_efficiency[0].value
 
         # Best for fairness
         best_fairness = max(algorithm_results.items(), key=lambda x: x[1].fairness_index)
-        recommendations['fairness'] = best_fairness[0].value
+        recommendations["fairness"] = best_fairness[0].value
 
         # Best for low latency
         best_latency = min(algorithm_results.items(), key=lambda x: x[1].mean_latency)
-        recommendations['low_latency'] = best_latency[0].value
+        recommendations["low_latency"] = best_latency[0].value
 
         return recommendations
 

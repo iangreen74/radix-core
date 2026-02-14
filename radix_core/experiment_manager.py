@@ -5,28 +5,30 @@ Provides comprehensive experiment lifecycle management, parameter tracking,
 result storage, and reproducibility features for GPU orchestration research.
 """
 
-import json
-import uuid
 import hashlib
-import shutil
-from pathlib import Path
-from datetime import datetime
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Any, Optional
-from contextlib import contextmanager
-import yaml
+import json
 import random
-import numpy as np
+import shutil
 import threading
+import uuid
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import yaml
 
 from .config import get_config
-from .logging import get_logger, CorrelationContext, trace_operation
+from .logging import CorrelationContext, get_logger, trace_operation
 from .metrics_enhanced import get_metrics_collector
 
 
 @dataclass
 class ExperimentConfig:
     """Configuration for an experiment."""
+
     name: str
     description: str
     tags: List[str] = field(default_factory=list)
@@ -40,6 +42,7 @@ class ExperimentConfig:
 @dataclass
 class ExperimentRun:
     """Individual experiment run instance."""
+
     run_id: str
     experiment_id: str
     config: ExperimentConfig
@@ -63,6 +66,7 @@ class ExperimentRun:
 @dataclass
 class ExperimentSeries:
     """Series of related experiments (e.g., hyperparameter sweep)."""
+
     series_id: str
     name: str
     description: str
@@ -107,10 +111,12 @@ class ExperimentManager:
         # Load existing data
         self._load_from_storage()
 
-        self.logger.info("Experiment manager initialized",
-                        storage_path=str(self.storage_path),
-                        loaded_experiments=len(self._experiments),
-                        loaded_runs=len(self._runs))
+        self.logger.info(
+            "Experiment manager initialized",
+            storage_path=str(self.storage_path),
+            loaded_experiments=len(self._experiments),
+            loaded_runs=len(self._runs),
+        )
 
     @trace_operation("create_experiment")
     def create_experiment(self, config: ExperimentConfig) -> str:
@@ -122,17 +128,20 @@ class ExperimentManager:
 
         self._save_to_storage()
 
-        self.logger.info("Experiment created",
-                        experiment_id=experiment_id,
-                        name=config.name,
-                        description=config.description,
-                        parameters=config.parameters)
+        self.logger.info(
+            "Experiment created",
+            experiment_id=experiment_id,
+            name=config.name,
+            description=config.description,
+            parameters=config.parameters,
+        )
 
         return experiment_id
 
     @trace_operation("start_run")
-    def start_run(self, experiment_id: str, parameters: Dict[str, Any] = None,
-                  tags: List[str] = None) -> str:
+    def start_run(
+        self, experiment_id: str, parameters: Dict[str, Any] = None, tags: List[str] = None
+    ) -> str:
         """Start a new experiment run."""
         if experiment_id not in self._experiments:
             raise ValueError(f"Experiment {experiment_id} not found")
@@ -153,7 +162,7 @@ class ExperimentManager:
             status="pending",
             correlation_id=CorrelationContext.get_correlation_id(),
             parameters=merged_parameters,
-            reproducibility_hash=self._compute_reproducibility_hash(merged_parameters)
+            reproducibility_hash=self._compute_reproducibility_hash(merged_parameters),
         )
 
         # Add environment information
@@ -167,9 +176,7 @@ class ExperimentManager:
 
         # Start metrics tracking
         self.metrics_collector.start_job_metrics(
-            job_id=run_id,
-            job_type="experiment_run",
-            executor_type="experiment_manager"
+            job_id=run_id, job_type="experiment_run", executor_type="experiment_manager"
         )
 
         # Set reproducibility
@@ -181,17 +188,24 @@ class ExperimentManager:
 
         self._save_to_storage()
 
-        self.logger.info("Experiment run started",
-                        run_id=run_id,
-                        experiment_id=experiment_id,
-                        parameters=merged_parameters,
-                        reproducibility_hash=run.reproducibility_hash)
+        self.logger.info(
+            "Experiment run started",
+            run_id=run_id,
+            experiment_id=experiment_id,
+            parameters=merged_parameters,
+            reproducibility_hash=run.reproducibility_hash,
+        )
 
         return run_id
 
     @trace_operation("finish_run")
-    def finish_run(self, run_id: str, success: bool = True, results: Dict[str, Any] = None,
-                   error_message: str = None):
+    def finish_run(
+        self,
+        run_id: str,
+        success: bool = True,
+        results: Dict[str, Any] = None,
+        error_message: str = None,
+    ):
         """Finish an experiment run."""
         if run_id not in self._runs:
             raise ValueError(f"Run {run_id} not found")
@@ -216,7 +230,7 @@ class ExperimentManager:
             success=success,
             duration_seconds=run.duration_seconds,
             peak_memory_mb=run.metrics.get("peak_memory_mb", 0.0),
-            cpu_time_seconds=run.metrics.get("cpu_time_seconds", 0.0)
+            cpu_time_seconds=run.metrics.get("cpu_time_seconds", 0.0),
         )
 
         with self._lock:
@@ -225,15 +239,18 @@ class ExperimentManager:
 
         self._save_to_storage()
 
-        self.logger.info("Experiment run finished",
-                        run_id=run_id,
-                        success=success,
-                        duration_seconds=run.duration_seconds,
-                        results_count=len(run.results))
+        self.logger.info(
+            "Experiment run finished",
+            run_id=run_id,
+            success=success,
+            duration_seconds=run.duration_seconds,
+            results_count=len(run.results),
+        )
 
     @contextmanager
-    def experiment_run(self, experiment_id: str, parameters: Dict[str, Any] = None,
-                      tags: List[str] = None):
+    def experiment_run(
+        self, experiment_id: str, parameters: Dict[str, Any] = None, tags: List[str] = None
+    ):
         """Context manager for experiment runs."""
         run_id = self.start_run(experiment_id, parameters, tags)
 
@@ -244,8 +261,9 @@ class ExperimentManager:
             self.finish_run(run_id, success=False, error_message=str(e))
             raise
 
-    def log_metric(self, run_id: str, name: str, value: float, step: int = 0,
-                  timestamp: datetime = None):
+    def log_metric(
+        self, run_id: str, name: str, value: float, step: int = 0, timestamp: datetime = None
+    ):
         """Log a metric for an experiment run."""
         if run_id not in self._runs:
             raise ValueError(f"Run {run_id} not found")
@@ -257,7 +275,7 @@ class ExperimentManager:
             "name": name,
             "value": value,
             "step": step,
-            "timestamp": timestamp.isoformat()
+            "timestamp": timestamp.isoformat(),
         }
 
         run = self._runs[run_id]
@@ -268,16 +286,10 @@ class ExperimentManager:
 
         # Also record in global metrics system
         self.metrics_collector.record_metric(
-            f"experiment.{name}",
-            value,
-            {"run_id": run_id, "experiment_id": run.experiment_id}
+            f"experiment.{name}", value, {"run_id": run_id, "experiment_id": run.experiment_id}
         )
 
-        self.logger.debug("Metric logged",
-                         run_id=run_id,
-                         metric_name=name,
-                         value=value,
-                         step=step)
+        self.logger.debug("Metric logged", run_id=run_id, metric_name=name, value=value, step=step)
 
     def log_result(self, run_id: str, key: str, value: Any):
         """Log a result for an experiment run."""
@@ -287,10 +299,7 @@ class ExperimentManager:
         run = self._runs[run_id]
         run.results[key] = value
 
-        self.logger.debug("Result logged",
-                         run_id=run_id,
-                         result_key=key,
-                         result_value=value)
+        self.logger.debug("Result logged", run_id=run_id, result_key=key, result_value=value)
 
     def save_artifact(self, run_id: str, artifact_path: Path, artifact_name: str = None) -> str:
         """Save an artifact for an experiment run."""
@@ -318,16 +327,22 @@ class ExperimentManager:
         artifact_rel_path = str(destination.relative_to(self.storage_path))
         run.artifacts.append(artifact_rel_path)
 
-        self.logger.info("Artifact saved",
-                        run_id=run_id,
-                        artifact_name=artifact_name,
-                        artifact_path=str(destination))
+        self.logger.info(
+            "Artifact saved",
+            run_id=run_id,
+            artifact_name=artifact_name,
+            artifact_path=str(destination),
+        )
 
         return artifact_rel_path
 
-    def create_experiment_series(self, name: str, description: str,
-                               base_config: ExperimentConfig,
-                               parameter_grid: Dict[str, List[Any]]) -> str:
+    def create_experiment_series(
+        self,
+        name: str,
+        description: str,
+        base_config: ExperimentConfig,
+        parameter_grid: Dict[str, List[Any]],
+    ) -> str:
         """Create an experiment series for parameter sweeps."""
         series_id = self._generate_id(f"series_{name}")
 
@@ -336,7 +351,7 @@ class ExperimentManager:
             name=name,
             description=description,
             base_config=base_config,
-            parameter_grid=parameter_grid
+            parameter_grid=parameter_grid,
         )
 
         with self._lock:
@@ -344,10 +359,12 @@ class ExperimentManager:
 
         self._save_to_storage()
 
-        self.logger.info("Experiment series created",
-                        series_id=series_id,
-                        name=name,
-                        parameter_combinations=self._count_parameter_combinations(parameter_grid))
+        self.logger.info(
+            "Experiment series created",
+            series_id=series_id,
+            name=name,
+            parameter_combinations=self._count_parameter_combinations(parameter_grid),
+        )
 
         return series_id
 
@@ -384,18 +401,18 @@ class ExperimentManager:
 
         except Exception as e:
             series.status = "failed"
-            self.logger.error("Experiment series failed",
-                            series_id=series_id,
-                            error=str(e))
+            self.logger.error("Experiment series failed", series_id=series_id, error=str(e))
             raise
 
         finally:
             self._save_to_storage()
 
-        self.logger.info("Experiment series completed",
-                        series_id=series_id,
-                        total_runs=len(run_ids),
-                        successful_runs=len([r for r in run_ids if self._runs[r].status == "completed"]))
+        self.logger.info(
+            "Experiment series completed",
+            series_id=series_id,
+            total_runs=len(run_ids),
+            successful_runs=len([r for r in run_ids if self._runs[r].status == "completed"]),
+        )
 
         return run_ids
 
@@ -437,7 +454,7 @@ class ExperimentManager:
             "runs": [self._runs[rid] for rid in run_ids if rid in self._runs],
             "parameter_differences": {},
             "result_comparison": {},
-            "metric_comparison": {}
+            "metric_comparison": {},
         }
 
         # Find parameter differences
@@ -461,42 +478,46 @@ class ExperimentManager:
 
     def export_experiment_data(self, experiment_id: str = None, format: str = "json") -> Path:
         """Export experiment data to file."""
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
         if experiment_id:
             filename = f"experiment_{experiment_id}_{timestamp}.{format}"
             data = {
-                "experiment": asdict(self._experiments[experiment_id]) if experiment_id in self._experiments else None,
-                "runs": [asdict(run) for run in self._runs.values() if run.experiment_id == experiment_id]
+                "experiment": (
+                    asdict(self._experiments[experiment_id])
+                    if experiment_id in self._experiments
+                    else None
+                ),
+                "runs": [
+                    asdict(run) for run in self._runs.values() if run.experiment_id == experiment_id
+                ],
             }
         else:
             filename = f"all_experiments_{timestamp}.{format}"
             data = {
                 "experiments": {eid: asdict(exp) for eid, exp in self._experiments.items()},
                 "runs": {rid: asdict(run) for rid, run in self._runs.items()},
-                "series": {sid: asdict(series) for sid, series in self._series.items()}
+                "series": {sid: asdict(series) for sid, series in self._series.items()},
             }
 
         export_path = self.storage_path / filename
 
         if format == "json":
-            with open(export_path, 'w') as f:
+            with open(export_path, "w") as f:
                 json.dump(data, f, indent=2, default=str)
         elif format == "yaml":
-            with open(export_path, 'w') as f:
+            with open(export_path, "w") as f:
                 yaml.dump(data, f, default_flow_style=False)
         else:
             raise ValueError(f"Unsupported format: {format}")
 
-        self.logger.info("Experiment data exported",
-                        export_path=str(export_path),
-                        format=format)
+        self.logger.info("Experiment data exported", export_path=str(export_path), format=format)
 
         return export_path
 
     def _generate_id(self, prefix: str) -> str:
         """Generate a unique ID."""
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         random_suffix = str(uuid.uuid4())[:8]
         return f"{prefix}_{timestamp}_{random_suffix}"
 
@@ -507,7 +528,7 @@ class ExperimentManager:
             "parameters": parameters,
             "git_commit": self._get_git_commit(),
             "python_version": self._get_python_version(),
-            "random_seed": parameters.get("random_seed", self.config.research.random_seed)
+            "random_seed": parameters.get("random_seed", self.config.research.random_seed),
         }
 
         hash_string = json.dumps(hash_data, sort_keys=True)
@@ -525,6 +546,7 @@ class ExperimentManager:
         """Collect host system information."""
         try:
             import platform
+
             import psutil
 
             return {
@@ -533,7 +555,7 @@ class ExperimentManager:
                 "python_version": platform.python_version(),
                 "cpu_count": psutil.cpu_count(),
                 "memory_gb": psutil.virtual_memory().total / 1024 / 1024 / 1024,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception:
             return {"error": "Failed to collect host info"}
@@ -541,17 +563,19 @@ class ExperimentManager:
     def _get_python_version(self) -> str:
         """Get Python version."""
         import sys
+
         return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
     def _get_git_commit(self) -> Optional[str]:
         """Get current git commit hash."""
         try:
             import subprocess
+
             result = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 capture_output=True,
                 text=True,
-                cwd=self.storage_path.parent
+                cwd=self.storage_path.parent,
             )
             return result.stdout.strip() if result.returncode == 0 else None
         except Exception:
@@ -562,14 +586,17 @@ class ExperimentManager:
         try:
             # Get system metrics
             import psutil
+
             process = psutil.Process()
 
-            run.metrics.update({
-                "final_memory_mb": process.memory_info().rss / 1024 / 1024,
-                "cpu_percent": process.cpu_percent(),
-                "num_threads": process.num_threads(),
-                "num_fds": process.num_fds() if hasattr(process, 'num_fds') else 0
-            })
+            run.metrics.update(
+                {
+                    "final_memory_mb": process.memory_info().rss / 1024 / 1024,
+                    "cpu_percent": process.cpu_percent(),
+                    "num_threads": process.num_threads(),
+                    "num_fds": process.num_fds() if hasattr(process, "num_fds") else 0,
+                }
+            )
         except Exception as e:
             self.logger.warning("Failed to collect run metrics", error=str(e))
 
@@ -580,7 +607,9 @@ class ExperimentManager:
             count *= len(values)
         return count
 
-    def _generate_parameter_combinations(self, parameter_grid: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
+    def _generate_parameter_combinations(
+        self, parameter_grid: Dict[str, List[Any]]
+    ) -> List[Dict[str, Any]]:
         """Generate all parameter combinations."""
         import itertools
 
@@ -619,7 +648,9 @@ class ExperimentManager:
                     series_data = json.load(f)
                     for sid, series_dict in series_data.items():
                         if series_dict.get("created_time"):
-                            series_dict["created_time"] = datetime.fromisoformat(series_dict["created_time"])
+                            series_dict["created_time"] = datetime.fromisoformat(
+                                series_dict["created_time"]
+                            )
                         self._series[sid] = ExperimentSeries(**series_dict)
 
         except Exception as e:
@@ -630,17 +661,17 @@ class ExperimentManager:
         try:
             # Save experiments
             experiments_data = {eid: asdict(exp) for eid, exp in self._experiments.items()}
-            with open(self.experiments_db_path, 'w') as f:
+            with open(self.experiments_db_path, "w") as f:
                 json.dump(experiments_data, f, indent=2, default=str)
 
             # Save runs
             runs_data = {rid: asdict(run) for rid, run in self._runs.items()}
-            with open(self.runs_db_path, 'w') as f:
+            with open(self.runs_db_path, "w") as f:
                 json.dump(runs_data, f, indent=2, default=str)
 
             # Save series
             series_data = {sid: asdict(series) for sid, series in self._series.items()}
-            with open(self.series_db_path, 'w') as f:
+            with open(self.series_db_path, "w") as f:
                 json.dump(series_data, f, indent=2, default=str)
 
         except Exception as e:
@@ -660,14 +691,12 @@ def get_experiment_manager() -> ExperimentManager:
 
 
 # Convenience functions
-def create_experiment(name: str, description: str, parameters: Dict[str, Any] = None,
-                     tags: List[str] = None) -> str:
+def create_experiment(
+    name: str, description: str, parameters: Dict[str, Any] = None, tags: List[str] = None
+) -> str:
     """Convenience function to create an experiment."""
     config = ExperimentConfig(
-        name=name,
-        description=description,
-        parameters=parameters or {},
-        tags=tags or []
+        name=name, description=description, parameters=parameters or {}, tags=tags or []
     )
     return get_experiment_manager().create_experiment(config)
 

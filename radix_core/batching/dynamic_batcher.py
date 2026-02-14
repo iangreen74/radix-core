@@ -5,28 +5,29 @@ This module implements intelligent batching that adapts to workload patterns
 while respecting latency SLAs and memory constraints.
 """
 
-import time
-from typing import Dict, List, Any, Optional, Callable, Generic, TypeVar
-from dataclasses import dataclass, field
-from collections import deque
-from enum import Enum
 import threading
+import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 from ..config import get_config
-from ..logging import get_logger
-from ..utils.timers import time_operation
-from ..utils.randfail import seeded_failure
 from ..dryrun import DryRunGuard
+from ..logging import get_logger
+from ..utils.randfail import seeded_failure
+from ..utils.timers import time_operation
 
 logger = get_logger(__name__)
 
-T = TypeVar('T')
-R = TypeVar('R')
+T = TypeVar("T")
+R = TypeVar("R")
 
 
 class BatchStatus(Enum):
     """Status of a batch request."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -84,12 +85,14 @@ class DynamicBatcher(Generic[T, R]):
     - Comprehensive metrics and monitoring
     """
 
-    def __init__(self,
-                 processor: Callable[[List[T]], List[R]],
-                 max_batch_size: int = None,
-                 max_latency_ms: int = None,
-                 min_batch_size: int = 1,
-                 adaptive_sizing: bool = True):
+    def __init__(
+        self,
+        processor: Callable[[List[T]], List[R]],
+        max_batch_size: int = None,
+        max_latency_ms: int = None,
+        min_batch_size: int = 1,
+        adaptive_sizing: bool = True,
+    ):
         """
         Initialize dynamic batcher.
 
@@ -104,7 +107,9 @@ class DynamicBatcher(Generic[T, R]):
         self.processor = processor
 
         # Batch configuration
-        self.max_batch_size = max_batch_size or getattr(self.config.batching, 'default_batch_size', 32)
+        self.max_batch_size = max_batch_size or getattr(
+            self.config.batching, "default_batch_size", 32
+        )
         self.max_latency_ms = max_latency_ms or 5000  # 5 second default
         self.min_batch_size = min_batch_size
         self.adaptive_sizing = adaptive_sizing
@@ -121,7 +126,7 @@ class DynamicBatcher(Generic[T, R]):
         # Adaptive sizing state
         self.recent_throughputs: deque = deque(maxlen=100)
         self.recent_latencies: deque = deque(maxlen=100)
-        self.optimal_batch_size = self.max_batch_size // 2
+        self.optimal_batch_size = (self.max_batch_size or 32) // 2
 
         # Metrics
         self.total_requests = 0
@@ -142,10 +147,12 @@ class DynamicBatcher(Generic[T, R]):
             self.processing_thread = threading.Thread(target=self._processing_loop, daemon=True)
             self.processing_thread.start()
 
-            logger.info("Dynamic batcher started",
-                       max_batch_size=self.max_batch_size,
-                       max_latency_ms=self.max_latency_ms,
-                       adaptive_sizing=self.adaptive_sizing)
+            logger.info(
+                "Dynamic batcher started",
+                max_batch_size=self.max_batch_size,
+                max_latency_ms=self.max_latency_ms,
+                adaptive_sizing=self.adaptive_sizing,
+            )
 
     def stop(self):
         """Stop the batcher processing loop."""
@@ -181,10 +188,12 @@ class DynamicBatcher(Generic[T, R]):
             self.priority_queues[priority].append(request)
             self.total_requests += 1
 
-            logger.debug("Request submitted for batching",
-                        request_id=request.request_id,
-                        priority=priority,
-                        queue_size=len(self.priority_queues[priority]))
+            logger.debug(
+                "Request submitted for batching",
+                request_id=request.request_id,
+                priority=priority,
+                queue_size=len(self.priority_queues[priority]),
+            )
 
             return request.request_id
 
@@ -216,7 +225,7 @@ class DynamicBatcher(Generic[T, R]):
             if not self.priority_queues:
                 return None
 
-            batch = []
+            batch: List[BatchRequest[T]] = []
             target_batch_size = self._get_target_batch_size()
 
             # Process queues by priority (highest first)
@@ -228,9 +237,9 @@ class DynamicBatcher(Generic[T, R]):
 
                     # Check if request should be processed now
                     should_process = (
-                        len(batch) >= self.min_batch_size or
-                        request.age_ms >= self.max_latency_ms or
-                        request.is_expired
+                        len(batch) >= self.min_batch_size
+                        or request.age_ms >= self.max_latency_ms
+                        or request.is_expired
                     )
 
                     if should_process:
@@ -246,32 +255,34 @@ class DynamicBatcher(Generic[T, R]):
             for request in batch:
                 if request.is_expired:
                     self.sla_violations += 1
-                    logger.warning("SLA violation detected",
-                                  request_id=request.request_id,
-                                  age_ms=request.age_ms,
-                                  max_latency_ms=request.max_latency_ms)
+                    logger.warning(
+                        "SLA violation detected",
+                        request_id=request.request_id,
+                        age_ms=request.age_ms,
+                        max_latency_ms=request.max_latency_ms,
+                    )
 
             return batch if batch else None
 
     def _get_target_batch_size(self) -> int:
         """Calculate target batch size based on adaptive strategy."""
         if not self.adaptive_sizing:
-            return self.max_batch_size
+            return self.max_batch_size or 32
 
         # Use recent performance to adjust batch size
         if len(self.recent_throughputs) < 10:
-            return self.optimal_batch_size
+            return self.optimal_batch_size or 16
 
         # Calculate recent average latency
         avg_latency = sum(self.recent_latencies) / len(self.recent_latencies)
 
         # Adjust batch size based on performance
         if avg_latency > self.max_latency_ms * 0.8:  # Approaching SLA limit
-            self.optimal_batch_size = max(self.min_batch_size,
-                                        int(self.optimal_batch_size * 0.9))
+            self.optimal_batch_size = max(self.min_batch_size, int(self.optimal_batch_size * 0.9))
         elif avg_latency < self.max_latency_ms * 0.5:  # Well under SLA
-            self.optimal_batch_size = min(self.max_batch_size,
-                                        int(self.optimal_batch_size * 1.1))
+            self.optimal_batch_size = min(
+                self.max_batch_size or 32, int(self.optimal_batch_size * 1.1)
+            )
 
         return self.optimal_batch_size
 
@@ -283,9 +294,7 @@ class DynamicBatcher(Generic[T, R]):
         self.executor.submit(self._process_batch, batch_id, batch)
 
         # Don't wait for completion in the main loop
-        logger.debug("Batch submitted for processing",
-                    batch_id=batch_id,
-                    batch_size=len(batch))
+        logger.debug("Batch submitted for processing", batch_id=batch_id, batch_size=len(batch))
 
     @DryRunGuard.protect
     def _process_batch(self, batch_id: str, batch: List[BatchRequest[T]]) -> BatchResult[R]:
@@ -298,10 +307,12 @@ class DynamicBatcher(Generic[T, R]):
                 batch_data = [req.data for req in batch]
                 request_ids = [req.request_id for req in batch]
 
-                logger.info("Processing batch",
-                           batch_id=batch_id,
-                           batch_size=len(batch),
-                           request_ids=request_ids[:5])  # Log first 5 IDs
+                logger.info(
+                    "Processing batch",
+                    batch_id=batch_id,
+                    batch_size=len(batch),
+                    request_ids=request_ids[:5],
+                )  # Log first 5 IDs
 
                 # Process the batch
                 results = self.processor(batch_data)
@@ -327,24 +338,28 @@ class DynamicBatcher(Generic[T, R]):
                     success=True,
                     metadata={
                         "throughput_items_per_sec": throughput,
-                        "avg_latency_ms": processing_time_ms / len(batch)
-                    }
+                        "avg_latency_ms": processing_time_ms / len(batch),
+                    },
                 )
 
-                logger.info("Batch processed successfully",
-                           batch_id=batch_id,
-                           processing_time_ms=processing_time_ms,
-                           throughput=throughput)
+                logger.info(
+                    "Batch processed successfully",
+                    batch_id=batch_id,
+                    processing_time_ms=processing_time_ms,
+                    throughput=throughput,
+                )
 
                 return result
 
         except Exception as e:
             processing_time_ms = (time.time() - start_time) * 1000
 
-            logger.error("Batch processing failed",
-                        batch_id=batch_id,
-                        error=str(e),
-                        processing_time_ms=processing_time_ms)
+            logger.error(
+                "Batch processing failed",
+                batch_id=batch_id,
+                error=str(e),
+                processing_time_ms=processing_time_ms,
+            )
 
             return BatchResult(
                 batch_id=batch_id,
@@ -353,20 +368,23 @@ class DynamicBatcher(Generic[T, R]):
                 processing_time_ms=processing_time_ms,
                 batch_size=len(batch),
                 success=False,
-                error=str(e)
+                error=str(e),
             )
 
     def get_stats(self) -> Dict[str, Any]:
         """Get batcher statistics."""
         with self.lock:
-            queue_sizes = {priority: len(queue)
-                          for priority, queue in self.priority_queues.items()}
+            queue_sizes = {priority: len(queue) for priority, queue in self.priority_queues.items()}
 
-            avg_processing_time = (self.total_processing_time / self.total_batches
-                                 if self.total_batches > 0 else 0)
+            avg_processing_time = (
+                self.total_processing_time / self.total_batches if self.total_batches > 0 else 0
+            )
 
-            avg_throughput = (sum(self.recent_throughputs) / len(self.recent_throughputs)
-                            if self.recent_throughputs else 0)
+            avg_throughput = (
+                sum(self.recent_throughputs) / len(self.recent_throughputs)
+                if self.recent_throughputs
+                else 0
+            )
 
             return {
                 "is_running": self.is_running,
@@ -383,8 +401,8 @@ class DynamicBatcher(Generic[T, R]):
                     "max_batch_size": self.max_batch_size,
                     "max_latency_ms": self.max_latency_ms,
                     "min_batch_size": self.min_batch_size,
-                    "adaptive_sizing": self.adaptive_sizing
-                }
+                    "adaptive_sizing": self.adaptive_sizing,
+                },
             }
 
     def reset_stats(self):
@@ -412,19 +430,21 @@ class DynamicBatcher(Generic[T, R]):
 class BatchingStrategy(Enum):
     """Different batching strategies."""
 
-    LATENCY_FIRST = "latency_first"      # Prioritize meeting latency SLAs
+    LATENCY_FIRST = "latency_first"  # Prioritize meeting latency SLAs
     THROUGHPUT_FIRST = "throughput_first"  # Prioritize maximum throughput
-    BALANCED = "balanced"                # Balance latency and throughput
-    ADAPTIVE = "adaptive"                # Adapt based on workload patterns
+    BALANCED = "balanced"  # Balance latency and throughput
+    ADAPTIVE = "adaptive"  # Adapt based on workload patterns
 
 
-def create_text_batcher(processor: Callable[[List[str]], List[str]],
-                       strategy: BatchingStrategy = BatchingStrategy.ADAPTIVE) -> DynamicBatcher[str, str]:
+def create_text_batcher(
+    processor: Callable[[List[str]], List[str]],
+    strategy: BatchingStrategy = BatchingStrategy.ADAPTIVE,
+) -> DynamicBatcher[str, str]:
     """Create a batcher optimized for text processing."""
     config = get_config()
 
-    batch_latency_ms = getattr(config.batching, 'batch_latency_ms', 100)
-    max_batch = getattr(config.batching, 'max_batch_size', config.batching.default_batch_size)
+    batch_latency_ms = getattr(config.batching, "batch_latency_ms", 100)
+    max_batch = getattr(config.batching, "max_batch_size", config.batching.default_batch_size)
 
     # Strategy-specific configurations
     if strategy == BatchingStrategy.LATENCY_FIRST:
@@ -438,11 +458,11 @@ def create_text_batcher(processor: Callable[[List[str]], List[str]],
     else:  # BALANCED or ADAPTIVE
         max_batch_size = max_batch
         max_latency_ms = batch_latency_ms
-        adaptive_sizing = (strategy == BatchingStrategy.ADAPTIVE)
+        adaptive_sizing = strategy == BatchingStrategy.ADAPTIVE
 
     return DynamicBatcher(
         processor=processor,
         max_batch_size=max_batch_size,
         max_latency_ms=max_latency_ms,
-        adaptive_sizing=adaptive_sizing
+        adaptive_sizing=adaptive_sizing,
     )

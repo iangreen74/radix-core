@@ -7,14 +7,14 @@ and mutual information analysis for workload optimization.
 """
 
 import math
-import numpy as np
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 
 from .logging import get_logger, trace_operation
 from .types import Job
-
 
 logger = get_logger(__name__)
 
@@ -22,6 +22,7 @@ logger = get_logger(__name__)
 @dataclass
 class InformationMetrics:
     """Information-theoretic metrics for analysis."""
+
     entropy: float
     mutual_information: float
     conditional_entropy: float
@@ -33,6 +34,7 @@ class InformationMetrics:
 @dataclass
 class ResourceInformation:
     """Information content of resource utilization patterns."""
+
     resource_type: str
     entropy_bits: float
     predictability_score: float
@@ -69,10 +71,11 @@ class InformationTheoryOrchestrator:
 
         # Calculate entropy for different scheduling arrangements
         best_order = jobs.copy()
-        best_entropy = float('inf')
+        best_entropy = float("inf")
 
         # Try different permutations (limited for performance)
         import itertools
+
         max_permutations = min(math.factorial(len(jobs)), 1000)
 
         for i, perm in enumerate(itertools.permutations(jobs)):
@@ -84,15 +87,18 @@ class InformationTheoryOrchestrator:
                 best_entropy = entropy
                 best_order = list(perm)
 
-        self.logger.info("Entropy-based scheduling completed",
-                        original_entropy=self._calculate_schedule_entropy(jobs),
-                        optimized_entropy=best_entropy,
-                        improvement=self._calculate_schedule_entropy(jobs) - best_entropy)
+        self.logger.info(
+            "Entropy-based scheduling completed",
+            original_entropy=self._calculate_schedule_entropy(jobs),
+            optimized_entropy=best_entropy,
+            improvement=self._calculate_schedule_entropy(jobs) - best_entropy,
+        )
 
         return best_order
 
-    def mutual_information_resource_allocation(self, jobs: List[Job],
-                                             available_resources: Dict[str, float]) -> Dict[str, Dict[str, float]]:
+    def mutual_information_resource_allocation(
+        self, jobs: List[Job], available_resources: Dict[str, float]
+    ) -> Dict[str, Dict[str, float]]:
         """
         Allocate resources based on mutual information between job characteristics
         and resource requirements to maximize information efficiency.
@@ -110,7 +116,9 @@ class InformationTheoryOrchestrator:
                 allocation_candidates = np.linspace(0, available_amount, 10)
 
                 for candidate_allocation in allocation_candidates:
-                    mi = self._calculate_mutual_information(job_features, resource_type, candidate_allocation)
+                    mi = self._calculate_mutual_information(
+                        job_features, resource_type, candidate_allocation
+                    )
                     mi_scores.append((candidate_allocation, mi))
 
                 # Select allocation with highest mutual information
@@ -121,8 +129,9 @@ class InformationTheoryOrchestrator:
 
         return allocations
 
-    def information_theoretic_batching(self, jobs: List[Job],
-                                     max_batch_size: int = 32) -> List[List[Job]]:
+    def information_theoretic_batching(
+        self, jobs: List[Job], max_batch_size: int = 32
+    ) -> List[List[Job]]:
         """
         Create batches that minimize information loss and maximize compression efficiency.
         """
@@ -146,9 +155,11 @@ class InformationTheoryOrchestrator:
 
             # Add to current batch if it doesn't increase entropy too much
             # or if current batch is empty
-            if (len(current_batch) == 0 or
-                test_entropy - current_batch_entropy < self._get_entropy_threshold() or
-                len(current_batch) >= max_batch_size):
+            if (
+                len(current_batch) == 0
+                or test_entropy - current_batch_entropy < self._get_entropy_threshold()
+                or len(current_batch) >= max_batch_size
+            ):
 
                 if len(current_batch) >= max_batch_size:
                     # Start new batch
@@ -170,14 +181,18 @@ class InformationTheoryOrchestrator:
         if current_batch:
             batches.append(current_batch)
 
-        self.logger.info("Information-theoretic batching completed",
-                        total_jobs=len(jobs),
-                        num_batches=len(batches),
-                        avg_batch_size=len(jobs) / len(batches) if batches else 0)
+        self.logger.info(
+            "Information-theoretic batching completed",
+            total_jobs=len(jobs),
+            num_batches=len(batches),
+            avg_batch_size=len(jobs) / len(batches) if batches else 0,
+        )
 
         return batches
 
-    def kolmogorov_complexity_optimization(self, workload_pattern: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def kolmogorov_complexity_optimization(
+        self, workload_pattern: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """
         Optimize workload execution based on Kolmogorov complexity estimation.
 
@@ -188,8 +203,8 @@ class InformationTheoryOrchestrator:
         pattern_str = str(workload_pattern)
 
         # Try different compression approaches
-        import zlib
         import lzma
+        import zlib
 
         original_size = len(pattern_str.encode())
         zlib_compressed = len(zlib.compress(pattern_str.encode()))
@@ -203,19 +218,22 @@ class InformationTheoryOrchestrator:
         optimization_strategy = {
             "complexity_ratio": complexity_ratio,
             "compressibility_score": 1.0 - complexity_ratio,
-            "optimization_potential": "high" if complexity_ratio > 0.7 else "medium" if complexity_ratio > 0.4 else "low",
-            "recommended_actions": self._generate_complexity_optimizations(complexity_ratio)
+            "optimization_potential": (
+                "high" if complexity_ratio > 0.7 else "medium" if complexity_ratio > 0.4 else "low"
+            ),
+            "recommended_actions": self._generate_complexity_optimizations(complexity_ratio),
         }
 
         return optimization_strategy
 
-    def shannon_entropy_load_balancing(self, nodes: List[Dict[str, Any]],
-                                     jobs: List[Job]) -> Dict[str, List[str]]:
+    def shannon_entropy_load_balancing(
+        self, nodes: List[Dict[str, Any]], jobs: List[Job]
+    ) -> Dict[str, List[str]]:
         """
         Distribute jobs across nodes to minimize Shannon entropy of load distribution.
         """
         # Calculate current load entropy for each node
-        node_loads = {node['id']: node.get('current_load', 0.0) for node in nodes}
+        node_loads = {node["id"]: node.get("current_load", 0.0) for node in nodes}
 
         # Assignment that minimizes entropy
         assignments = defaultdict(list)
@@ -225,7 +243,7 @@ class InformationTheoryOrchestrator:
 
             # Find assignment that minimizes total entropy
             best_node = None
-            best_entropy = float('inf')
+            best_entropy = float("inf")
 
             for node_id in node_loads:
                 # Calculate entropy if we assign job to this node
@@ -245,8 +263,9 @@ class InformationTheoryOrchestrator:
 
         return dict(assignments)
 
-    def information_gain_guided_scheduling(self, jobs: List[Job],
-                                         historical_performance: List[Dict[str, Any]]) -> List[Job]:
+    def information_gain_guided_scheduling(
+        self, jobs: List[Job], historical_performance: List[Dict[str, Any]]
+    ) -> List[Job]:
         """
         Schedule jobs to maximize information gain about system performance.
         """
@@ -254,7 +273,9 @@ class InformationTheoryOrchestrator:
             return jobs  # No historical data, return as-is
 
         # Calculate information gain for different scheduling orders
-        job_performance_correlations = self._calculate_job_performance_correlations(jobs, historical_performance)
+        job_performance_correlations = self._calculate_job_performance_correlations(
+            jobs, historical_performance
+        )
 
         # Schedule jobs to maximize information gain
         scheduled_jobs = []
@@ -262,11 +283,13 @@ class InformationTheoryOrchestrator:
 
         while remaining_jobs:
             best_job = None
-            best_info_gain = -float('inf')
+            best_info_gain = -float("inf")
 
             for job in remaining_jobs:
                 # Calculate expected information gain if we schedule this job next
-                info_gain = self._calculate_information_gain(job, scheduled_jobs, job_performance_correlations)
+                info_gain = self._calculate_information_gain(
+                    job, scheduled_jobs, job_performance_correlations
+                )
 
                 if info_gain > best_info_gain:
                     best_info_gain = info_gain
@@ -278,13 +301,15 @@ class InformationTheoryOrchestrator:
 
         return scheduled_jobs
 
-    def compression_based_resource_prediction(self, historical_usage: List[Dict[str, float]]) -> Dict[str, Any]:
+    def compression_based_resource_prediction(
+        self, historical_usage: List[Dict[str, float]]
+    ) -> Dict[str, Any]:
         """
         Predict future resource usage based on compression patterns in historical data.
         """
         predictions = {}
 
-        for resource_type in ['cpu', 'memory', 'gpu']:
+        for resource_type in ["cpu", "memory", "gpu"]:
             if not historical_usage:
                 continue
 
@@ -299,10 +324,12 @@ class InformationTheoryOrchestrator:
 
             # Generate predictions based on compression insights
             predictions[resource_type] = {
-                "next_value_prediction": self._predict_next_value(time_series, compression_analysis),
+                "next_value_prediction": self._predict_next_value(
+                    time_series, compression_analysis
+                ),
                 "pattern_complexity": compression_analysis["complexity"],
                 "predictability_score": compression_analysis["predictability"],
-                "trend_entropy": compression_analysis["trend_entropy"]
+                "trend_entropy": compression_analysis["trend_entropy"],
             }
 
         return predictions
@@ -319,7 +346,7 @@ class InformationTheoryOrchestrator:
                 job.requirements.cpu_cores,
                 job.requirements.memory_mb,
                 job.requirements.gpu_count,
-                job.priority
+                job.priority,
             )
             resource_patterns.append(pattern)
 
@@ -344,11 +371,12 @@ class InformationTheoryOrchestrator:
             "priority": float(job.priority),
             "max_runtime": float(job.max_runtime_seconds),
             "name_length": float(len(job.name)),
-            "has_dependencies": float(len(job.dependencies) > 0)
+            "has_dependencies": float(len(job.dependencies) > 0),
         }
 
-    def _calculate_mutual_information(self, job_features: Dict[str, float],
-                                    resource_type: str, allocation: float) -> float:
+    def _calculate_mutual_information(
+        self, job_features: Dict[str, float], resource_type: str, allocation: float
+    ) -> float:
         """Calculate mutual information between job features and resource allocation."""
         # Simplified mutual information calculation
         # In practice, this would use historical data and proper MI estimation
@@ -416,10 +444,12 @@ class InformationTheoryOrchestrator:
 
     def _estimate_job_load(self, job: Job) -> float:
         """Estimate computational load of a job."""
-        return (job.requirements.cpu_cores * 1.0 +
-                job.requirements.memory_mb * 0.5 +
-                job.requirements.gpu_count * 2.0 +
-                job.max_runtime_seconds / 3600.0)
+        return (
+            job.requirements.cpu_cores * 1.0
+            + job.requirements.memory_mb * 0.5
+            + job.requirements.gpu_count * 2.0
+            + job.max_runtime_seconds / 3600.0
+        )
 
     def _calculate_load_distribution_entropy(self, loads: List[float]) -> float:
         """Calculate entropy of load distribution across nodes."""
@@ -438,8 +468,9 @@ class InformationTheoryOrchestrator:
 
         return entropy
 
-    def _calculate_job_performance_correlations(self, jobs: List[Job],
-                                              historical_performance: List[Dict[str, Any]]) -> Dict[str, float]:
+    def _calculate_job_performance_correlations(
+        self, jobs: List[Job], historical_performance: List[Dict[str, Any]]
+    ) -> Dict[str, float]:
         """Calculate correlations between job characteristics and performance."""
         correlations = {}
 
@@ -453,12 +484,15 @@ class InformationTheoryOrchestrator:
                 similarity = self._calculate_feature_similarity(features, perf_data)
                 correlation_score += similarity
 
-            correlations[job.job_id] = correlation_score / len(historical_performance) if historical_performance else 0.0
+            correlations[job.job_id] = (
+                correlation_score / len(historical_performance) if historical_performance else 0.0
+            )
 
         return correlations
 
-    def _calculate_information_gain(self, job: Job, scheduled_jobs: List[Job],
-                                  correlations: Dict[str, float]) -> float:
+    def _calculate_information_gain(
+        self, job: Job, scheduled_jobs: List[Job], correlations: Dict[str, float]
+    ) -> float:
         """Calculate expected information gain from scheduling a job."""
         base_entropy = self._calculate_schedule_entropy(scheduled_jobs)
         new_entropy = self._calculate_schedule_entropy(scheduled_jobs + [job])
@@ -477,25 +511,28 @@ class InformationTheoryOrchestrator:
             return {"complexity": 0.0, "predictability": 0.0, "trend_entropy": 0.0}
 
         # Convert to string for compression analysis
-        series_str = ','.join(f"{x:.3f}" for x in time_series)
+        series_str = ",".join(f"{x:.3f}" for x in time_series)
 
         # Calculate compression ratio
         import zlib
+
         original_size = len(series_str.encode())
         compressed_size = len(zlib.compress(series_str.encode()))
         compression_ratio = compressed_size / original_size if original_size > 0 else 1.0
 
         # Calculate trend entropy
-        diffs = [time_series[i+1] - time_series[i] for i in range(len(time_series)-1)]
+        diffs = [time_series[i + 1] - time_series[i] for i in range(len(time_series) - 1)]
         trend_entropy = self._calculate_sequence_entropy(diffs)
 
         return {
             "complexity": compression_ratio,
             "predictability": 1.0 - compression_ratio,
-            "trend_entropy": trend_entropy
+            "trend_entropy": trend_entropy,
         }
 
-    def _predict_next_value(self, time_series: List[float], compression_analysis: Dict[str, float]) -> float:
+    def _predict_next_value(
+        self, time_series: List[float], compression_analysis: Dict[str, float]
+    ) -> float:
         """Predict next value in time series based on compression patterns."""
         if len(time_series) < 2:
             return time_series[-1] if time_series else 0.0
@@ -508,12 +545,13 @@ class InformationTheoryOrchestrator:
         if complexity < 0.5:  # Low complexity, high predictability
             prediction = time_series[-1] + recent_trend
         else:  # High complexity, use average
-            prediction = sum(time_series[-min(5, len(time_series)):]) / min(5, len(time_series))
+            prediction = sum(time_series[-min(5, len(time_series)) :]) / min(5, len(time_series))
 
         return prediction
 
-    def _calculate_feature_similarity(self, features1: Dict[str, float],
-                                    features2: Dict[str, Any]) -> float:
+    def _calculate_feature_similarity(
+        self, features1: Dict[str, float], features2: Dict[str, Any]
+    ) -> float:
         """Calculate similarity between feature sets."""
         # Convert features2 to numerical format
         numerical_features2 = {}
@@ -529,8 +567,8 @@ class InformationTheoryOrchestrator:
             return 0.0
 
         dot_product = sum(features1[key] * numerical_features2[key] for key in common_keys)
-        norm1 = math.sqrt(sum(features1[key]**2 for key in common_keys))
-        norm2 = math.sqrt(sum(numerical_features2[key]**2 for key in common_keys))
+        norm1 = math.sqrt(sum(features1[key] ** 2 for key in common_keys))
+        norm2 = math.sqrt(sum(numerical_features2[key] ** 2 for key in common_keys))
 
         if norm1 == 0 or norm2 == 0:
             return 0.0
@@ -577,21 +615,24 @@ class InformationTheoryOrchestrator:
         recommendations = []
 
         if complexity_ratio > 0.8:
-            recommendations.extend([
-                "High complexity detected - consider workload regularization",
-                "Implement pattern-based batching",
-                "Use entropy-guided scheduling"
-            ])
+            recommendations.extend(
+                [
+                    "High complexity detected - consider workload regularization",
+                    "Implement pattern-based batching",
+                    "Use entropy-guided scheduling",
+                ]
+            )
         elif complexity_ratio > 0.5:
-            recommendations.extend([
-                "Medium complexity - optimize resource allocation",
-                "Consider temporal batching strategies"
-            ])
+            recommendations.extend(
+                [
+                    "Medium complexity - optimize resource allocation",
+                    "Consider temporal batching strategies",
+                ]
+            )
         else:
-            recommendations.extend([
-                "Low complexity - system is well-optimized",
-                "Focus on throughput maximization"
-            ])
+            recommendations.extend(
+                ["Low complexity - system is well-optimized", "Focus on throughput maximization"]
+            )
 
         return recommendations
 
@@ -616,4 +657,6 @@ def entropy_based_scheduling(jobs: List[Job]) -> List[Job]:
 
 def information_theoretic_batching(jobs: List[Job], max_batch_size: int = 32) -> List[List[Job]]:
     """Create information-optimal batches."""
-    return get_information_theory_orchestrator().information_theoretic_batching(jobs, max_batch_size)
+    return get_information_theory_orchestrator().information_theoretic_batching(
+        jobs, max_batch_size
+    )

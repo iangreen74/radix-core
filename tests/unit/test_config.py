@@ -1,8 +1,15 @@
 """Tests for configuration management."""
 
 import pytest
+
 from radix_core.config import (
-    RadixConfig, SafetyConfig, ExecutionConfig, BatchingConfig, get_config, set_config, reset_config,
+    BatchingConfig,
+    ExecutionConfig,
+    RadixConfig,
+    SafetyConfig,
+    get_config,
+    reset_config,
+    set_config,
 )
 
 
@@ -97,7 +104,9 @@ class TestProductionModeConfig:
 
     def test_dry_run_false_allowed_in_production(self, monkeypatch):
         monkeypatch.setenv("RADIX_MODE", "production")
-        cfg = SafetyConfig(dry_run=False, cost_cap_usd=100.0, max_job_cost_usd=10.0, no_deploy_mode=False)
+        cfg = SafetyConfig(
+            dry_run=False, cost_cap_usd=100.0, max_job_cost_usd=10.0, no_deploy_mode=False
+        )
         assert cfg.dry_run is False
 
     def test_positive_cost_cap_required_in_production(self, monkeypatch):
@@ -112,7 +121,9 @@ class TestProductionModeConfig:
 
     def test_no_deploy_false_allowed_in_production(self, monkeypatch):
         monkeypatch.setenv("RADIX_MODE", "production")
-        cfg = SafetyConfig(dry_run=False, cost_cap_usd=100.0, max_job_cost_usd=10.0, no_deploy_mode=False)
+        cfg = SafetyConfig(
+            dry_run=False, cost_cap_usd=100.0, max_job_cost_usd=10.0, no_deploy_mode=False
+        )
         assert cfg.no_deploy_mode is False
 
     def test_ray_remote_allowed_in_production(self, monkeypatch):

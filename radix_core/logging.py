@@ -6,23 +6,22 @@ distributed tracing, safety-aware configuration, and detailed audit trails
 for research purposes.
 """
 
+import json
 import logging
 import logging.handlers
 import sys
-import json
+import threading
 import time
 import uuid
-import threading
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any, Optional
 from contextlib import contextmanager
+from datetime import datetime
 from functools import wraps
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 import structlog
 
 from .config import get_config
-
 
 # Thread-local storage for correlation context
 _correlation_context = threading.local()
@@ -34,7 +33,7 @@ class CorrelationContext:
     @staticmethod
     def get_correlation_id() -> str:
         """Get the current correlation ID, creating one if needed."""
-        if not hasattr(_correlation_context, 'correlation_id'):
+        if not hasattr(_correlation_context, "correlation_id"):
             _correlation_context.correlation_id = str(uuid.uuid4())[:8]
         return _correlation_context.correlation_id
 
@@ -46,8 +45,8 @@ class CorrelationContext:
     @staticmethod
     def clear_correlation_id():
         """Clear the correlation ID for the current thread."""
-        if hasattr(_correlation_context, 'correlation_id'):
-            delattr(_correlation_context, 'correlation_id')
+        if hasattr(_correlation_context, "correlation_id"):
+            delattr(_correlation_context, "correlation_id")
 
     @staticmethod
     def get_trace_context() -> Dict[str, Any]:
@@ -55,36 +54,40 @@ class CorrelationContext:
         correlation_id = CorrelationContext.get_correlation_id()
 
         # Get operation stack if available
-        operation_stack = getattr(_correlation_context, 'operation_stack', [])
+        operation_stack = getattr(_correlation_context, "operation_stack", [])
 
         return {
-            'correlation_id': correlation_id,
-            'thread_id': threading.get_ident(),
-            'operation_stack': operation_stack,
-            'depth': len(operation_stack)
+            "correlation_id": correlation_id,
+            "thread_id": threading.get_ident(),
+            "operation_stack": operation_stack,
+            "depth": len(operation_stack),
         }
 
     @staticmethod
     def push_operation(operation_name: str):
         """Push an operation onto the trace stack."""
-        if not hasattr(_correlation_context, 'operation_stack'):
+        if not hasattr(_correlation_context, "operation_stack"):
             _correlation_context.operation_stack = []
         _correlation_context.operation_stack.append(operation_name)
 
     @staticmethod
     def pop_operation():
         """Pop an operation from the trace stack."""
-        if hasattr(_correlation_context, 'operation_stack') and _correlation_context.operation_stack:
+        if (
+            hasattr(_correlation_context, "operation_stack")
+            and _correlation_context.operation_stack
+        ):
             return _correlation_context.operation_stack.pop()
         return None
 
 
 def with_correlation_id(correlation_id: str = None):
     """Decorator to run function with specific correlation ID."""
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            old_correlation_id = getattr(_correlation_context, 'correlation_id', None)
+            old_correlation_id = getattr(_correlation_context, "correlation_id", None)
 
             try:
                 if correlation_id:
@@ -102,11 +105,13 @@ def with_correlation_id(correlation_id: str = None):
                     CorrelationContext.clear_correlation_id()
 
         return wrapper
+
     return decorator
 
 
 def trace_operation(operation_name: str):
     """Decorator to trace function execution with operation stack."""
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -123,7 +128,7 @@ def trace_operation(operation_name: str):
                     f"Starting operation: {operation_name}",
                     operation=operation_name,
                     function=func.__name__,
-                    **trace_context
+                    **trace_context,
                 )
 
                 result = func(*args, **kwargs)
@@ -137,7 +142,7 @@ def trace_operation(operation_name: str):
                     function=func.__name__,
                     duration_seconds=duration,
                     success=True,
-                    **trace_context
+                    **trace_context,
                 )
 
                 return result
@@ -153,7 +158,7 @@ def trace_operation(operation_name: str):
                     duration_seconds=duration,
                     success=False,
                     error=str(e),
-                    **trace_context
+                    **trace_context,
                 )
                 raise
             finally:
@@ -161,6 +166,7 @@ def trace_operation(operation_name: str):
                 CorrelationContext.pop_operation()
 
         return wrapper
+
     return decorator
 
 
@@ -176,16 +182,16 @@ class SafetyAwareFormatter(logging.Formatter):
 
         # Add correlation context
         trace_context = CorrelationContext.get_trace_context()
-        record.correlation_id = trace_context['correlation_id']
-        record.thread_id = trace_context['thread_id']
-        record.operation_depth = trace_context['depth']
+        record.correlation_id = trace_context["correlation_id"]
+        record.thread_id = trace_context["thread_id"]
+        record.operation_depth = trace_context["depth"]
 
         # Add current operation if available
-        operation_stack = trace_context.get('operation_stack', [])
+        operation_stack = trace_context.get("operation_stack", [])
         record.current_operation = operation_stack[-1] if operation_stack else None
 
         # Add timestamp if not present
-        if not hasattr(record, 'timestamp'):
+        if not hasattr(record, "timestamp"):
             record.timestamp = datetime.utcnow().isoformat()
 
         return super().format(record)
@@ -196,38 +202,61 @@ class JSONFormatter(SafetyAwareFormatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'level': record.levelname,
-            'logger': record.name,
-            'message': record.getMessage(),
-            'module': record.module,
-            'function': record.funcName,
-            'line': record.lineno,
-            'correlation': {
-                'correlation_id': getattr(record, 'correlation_id', 'unknown'),
-                'thread_id': getattr(record, 'thread_id', 0),
-                'operation_depth': getattr(record, 'operation_depth', 0),
-                'current_operation': getattr(record, 'current_operation', None)
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+            "correlation": {
+                "correlation_id": getattr(record, "correlation_id", "unknown"),
+                "thread_id": getattr(record, "thread_id", 0),
+                "operation_depth": getattr(record, "operation_depth", 0),
+                "current_operation": getattr(record, "current_operation", None),
             },
-            'safety': {
-                'dry_run': getattr(record, 'dry_run', True),
-                'cost_cap_usd': getattr(record, 'cost_cap', 0.0),
-                'no_deploy_mode': getattr(record, 'no_deploy', True)
-            }
+            "safety": {
+                "dry_run": getattr(record, "dry_run", True),
+                "cost_cap_usd": getattr(record, "cost_cap", 0.0),
+                "no_deploy_mode": getattr(record, "no_deploy", True),
+            },
         }
 
         # Add exception info if present
         if record.exc_info:
-            log_entry['exception'] = self.formatException(record.exc_info)
+            log_entry["exception"] = self.formatException(record.exc_info)
 
         # Add extra fields (excluding internal fields)
         excluded_fields = {
-            'name', 'msg', 'args', 'levelname', 'levelno', 'pathname',
-            'filename', 'module', 'exc_info', 'exc_text', 'stack_info',
-            'lineno', 'funcName', 'created', 'msecs', 'relativeCreated',
-            'thread', 'threadName', 'processName', 'process', 'getMessage',
-            'dry_run', 'cost_cap', 'no_deploy', 'correlation_id', 'thread_id',
-            'operation_depth', 'current_operation', 'timestamp'
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "getMessage",
+            "dry_run",
+            "cost_cap",
+            "no_deploy",
+            "correlation_id",
+            "thread_id",
+            "operation_depth",
+            "current_operation",
+            "timestamp",
         }
 
         for key, value in record.__dict__.items():
@@ -242,37 +271,37 @@ class ConsoleFormatter(SafetyAwareFormatter):
 
     # ANSI color codes
     COLORS = {
-        'DEBUG': '\033[36m',      # Cyan
-        'INFO': '\033[32m',       # Green
-        'WARNING': '\033[33m',    # Yellow
-        'ERROR': '\033[31m',      # Red
-        'CRITICAL': '\033[35m',   # Magenta
-        'RESET': '\033[0m',       # Reset
-        'GRAY': '\033[90m',       # Gray for correlation IDs
-        'BOLD': '\033[1m'         # Bold
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[35m",  # Magenta
+        "RESET": "\033[0m",  # Reset
+        "GRAY": "\033[90m",  # Gray for correlation IDs
+        "BOLD": "\033[1m",  # Bold
     }
 
     def format(self, record: logging.LogRecord) -> str:
         # Add color to level name
-        level_color = self.COLORS.get(record.levelname, '')
-        reset_color = self.COLORS['RESET']
-        gray_color = self.COLORS['GRAY']
+        level_color = self.COLORS.get(record.levelname, "")
+        reset_color = self.COLORS["RESET"]
+        gray_color = self.COLORS["GRAY"]
 
         # Safety indicator
-        safety_indicator = "🔒" if getattr(record, 'dry_run', True) else "⚠️"
+        safety_indicator = "🔒" if getattr(record, "dry_run", True) else "⚠️"
 
         # Format timestamp
-        timestamp = datetime.utcnow().strftime('%H:%M:%S.%f')[:-3]  # Include milliseconds
+        timestamp = datetime.utcnow().strftime("%H:%M:%S.%f")[:-3]  # Include milliseconds
 
         # Correlation ID (short form for console)
-        correlation_id = getattr(record, 'correlation_id', 'unknown')
+        correlation_id = getattr(record, "correlation_id", "unknown")
 
         # Operation depth indicator
-        depth = getattr(record, 'operation_depth', 0)
+        depth = getattr(record, "operation_depth", 0)
         indent = "  " * depth
 
         # Current operation
-        current_op = getattr(record, 'current_operation', '')
+        current_op = getattr(record, "current_operation", "")
         operation_info = f"[{current_op}]" if current_op else ""
 
         # Format message
@@ -310,16 +339,16 @@ class AuditLogger:
             audit_dir = Path(config.research.results_dir) / "audit"
             audit_dir.mkdir(parents=True, exist_ok=True)
 
-            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             self.audit_file = audit_dir / f"audit_{timestamp}.log"
 
     def log_safety_event(self, event_type: str, details: Dict[str, Any]):
         """Log safety-related events."""
         event = {
-            'event_type': 'safety',
-            'safety_event': event_type,
-            'timestamp': datetime.utcnow().isoformat(),
-            'details': details
+            "event_type": "safety",
+            "safety_event": event_type,
+            "timestamp": datetime.utcnow().isoformat(),
+            "details": details,
         }
 
         self.logger.info("Safety event", **event)
@@ -328,11 +357,11 @@ class AuditLogger:
     def log_cost_event(self, operation: str, estimated_cost: float, actual_cost: float = 0.0):
         """Log cost-related events."""
         event = {
-            'event_type': 'cost',
-            'operation': operation,
-            'estimated_cost_usd': estimated_cost,
-            'actual_cost_usd': actual_cost,
-            'timestamp': datetime.utcnow().isoformat()
+            "event_type": "cost",
+            "operation": operation,
+            "estimated_cost_usd": estimated_cost,
+            "actual_cost_usd": actual_cost,
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         self.logger.info("Cost event", **event)
@@ -341,11 +370,11 @@ class AuditLogger:
     def log_execution_event(self, job_id: str, event_type: str, details: Dict[str, Any]):
         """Log job execution events."""
         event = {
-            'event_type': 'execution',
-            'job_id': job_id,
-            'execution_event': event_type,
-            'timestamp': datetime.utcnow().isoformat(),
-            'details': details
+            "event_type": "execution",
+            "job_id": job_id,
+            "execution_event": event_type,
+            "timestamp": datetime.utcnow().isoformat(),
+            "details": details,
         }
 
         self.logger.info("Execution event", **event)
@@ -354,11 +383,11 @@ class AuditLogger:
     def log_configuration_change(self, field: str, old_value: Any, new_value: Any):
         """Log configuration changes."""
         event = {
-            'event_type': 'configuration',
-            'field': field,
-            'old_value': old_value,
-            'new_value': new_value,
-            'timestamp': datetime.utcnow().isoformat()
+            "event_type": "configuration",
+            "field": field,
+            "old_value": old_value,
+            "new_value": new_value,
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         self.logger.warning("Configuration change", **event)
@@ -368,8 +397,8 @@ class AuditLogger:
         """Write event to audit file."""
         if self.audit_file:
             try:
-                with open(self.audit_file, 'a') as f:
-                    f.write(json.dumps(event) + '\n')
+                with open(self.audit_file, "a") as f:
+                    f.write(json.dumps(event) + "\n")
             except Exception as e:
                 # Don't fail if audit logging fails
                 self.logger.error("Failed to write audit log", error=str(e))
@@ -406,10 +435,12 @@ class PerformanceLogger:
                 start_time=start_timestamp.isoformat(),
                 success=success,
                 error=error,
-                **context
+                **context,
             )
 
-    def log_throughput(self, operation: str, items_processed: int, duration_seconds: float, **context):
+    def log_throughput(
+        self, operation: str, items_processed: int, duration_seconds: float, **context
+    ):
         """Log throughput metrics."""
         throughput = items_processed / duration_seconds if duration_seconds > 0 else 0
 
@@ -419,7 +450,7 @@ class PerformanceLogger:
             items_processed=items_processed,
             duration_seconds=duration_seconds,
             throughput_items_per_second=throughput,
-            **context
+            **context,
         )
 
     def log_resource_usage(self, cpu_percent: float, memory_mb: float, **context):
@@ -429,7 +460,7 @@ class PerformanceLogger:
             cpu_percent=cpu_percent,
             memory_mb=memory_mb,
             timestamp=datetime.utcnow().isoformat(),
-            **context
+            **context,
         )
 
 
@@ -448,8 +479,11 @@ def setup_logging():
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer() if config.logging.log_format == "json"
-            else structlog.dev.ConsoleRenderer()
+            (
+                structlog.processors.JSONRenderer()
+                if config.logging.log_format == "json"
+                else structlog.dev.ConsoleRenderer()
+            ),
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -480,21 +514,23 @@ def setup_logging():
         log_dir = Path(config.research.results_dir) / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         log_file = log_dir / f"radix_{timestamp}.log"
 
         file_handler = logging.handlers.RotatingFileHandler(
-            log_file, maxBytes=10*1024*1024, backupCount=5
+            log_file, maxBytes=10 * 1024 * 1024, backupCount=5
         )
         file_handler.setFormatter(JSONFormatter())
         root_logger.addHandler(file_handler)
 
     # Setup safety logging
     safety_logger = logging.getLogger("radix.safety")
-    safety_logger.info(f"Logging initialized - dry_run={config.safety.dry_run}, "
-                      f"cost_cap=${config.safety.cost_cap_usd}, "
-                      f"log_level={config.logging.log_level}, "
-                      f"log_format={config.logging.log_format}")
+    safety_logger.info(
+        f"Logging initialized - dry_run={config.safety.dry_run}, "
+        f"cost_cap=${config.safety.cost_cap_usd}, "
+        f"log_level={config.logging.log_level}, "
+        f"log_format={config.logging.log_format}"
+    )
 
 
 def get_logger(name: str) -> structlog.BoundLogger:
@@ -516,10 +552,7 @@ def get_performance_logger() -> PerformanceLogger:
 def log_safety_violation(violation: str, details: Dict[str, Any] = None):
     """Log a safety violation."""
     audit_logger = get_audit_logger()
-    audit_logger.log_safety_event("violation", {
-        "violation": violation,
-        "details": details or {}
-    })
+    audit_logger.log_safety_event("violation", {"violation": violation, "details": details or {}})
 
 
 def log_cost_estimate(operation: str, estimated_cost: float):

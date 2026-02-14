@@ -5,25 +5,26 @@ This module provides a wrapper around vLLM for high-performance inference
 with graceful fallback when vLLM is not available.
 """
 
-import time
-from typing import Dict, List, Any, Optional, Union
-from dataclasses import dataclass
 import threading
+import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
 # Graceful vLLM import
 try:
     from vllm import LLM, SamplingParams
     from vllm.engine.arg_utils import AsyncEngineArgs
+
     VLLM_AVAILABLE = True
 except ImportError:
     VLLM_AVAILABLE = False
     LLM = SamplingParams = AsyncEngineArgs = None
 
 from ..config import get_config
-from ..logging import get_logger
-from ..utils.timers import time_operation
-from ..utils.randfail import seeded_failure
 from ..dryrun import DryRunGuard
+from ..logging import get_logger
+from ..utils.randfail import seeded_failure
+from ..utils.timers import time_operation
 
 logger = get_logger(__name__)
 
@@ -53,12 +54,14 @@ class VLLMLocalRunner:
     - Performance monitoring
     """
 
-    def __init__(self,
-                 model_name: str = None,
-                 tensor_parallel_size: int = 1,
-                 gpu_memory_utilization: float = 0.9,
-                 max_model_len: int = None,
-                 enforce_eager: bool = True):
+    def __init__(
+        self,
+        model_name: str = None,
+        tensor_parallel_size: int = 1,
+        gpu_memory_utilization: float = 0.9,
+        max_model_len: int = None,
+        enforce_eager: bool = True,
+    ):
         """
         Initialize vLLM runner.
 
@@ -78,11 +81,11 @@ class VLLMLocalRunner:
         self.available = True
 
         # Model configuration
-        ml_config = getattr(self.config, 'ml', None)
-        self.model_name = model_name or getattr(ml_config, 'default_model_name', 'gpt2')
+        ml_config = getattr(self.config, "ml", None)
+        self.model_name = model_name or getattr(ml_config, "default_model_name", "gpt2")
         self.tensor_parallel_size = min(tensor_parallel_size, 1)  # Single GPU for safety
         self.gpu_memory_utilization = gpu_memory_utilization
-        self.max_model_len = max_model_len or getattr(ml_config, 'max_sequence_length', 512)
+        self.max_model_len = max_model_len or getattr(ml_config, "max_sequence_length", 512)
         self.enforce_eager = enforce_eager
 
         # vLLM engine
@@ -90,12 +93,11 @@ class VLLMLocalRunner:
         self.is_loaded = False
 
         # Default sampling parameters
-        self.default_sampling_params = SamplingParams(
-            temperature=0.7,
-            top_p=0.9,
-            max_tokens=50,
-            stop=None
-        ) if VLLM_AVAILABLE else None
+        self.default_sampling_params = (
+            SamplingParams(temperature=0.7, top_p=0.9, max_tokens=50, stop=None)
+            if VLLM_AVAILABLE
+            else None
+        )
 
         # Statistics
         self.total_requests = 0
@@ -106,10 +108,12 @@ class VLLMLocalRunner:
         self.lock = threading.RLock()
 
         if self.available:
-            logger.info("vLLM runner initialized",
-                       model_name=self.model_name,
-                       tensor_parallel_size=self.tensor_parallel_size,
-                       gpu_memory_utilization=gpu_memory_utilization)
+            logger.info(
+                "vLLM runner initialized",
+                model_name=self.model_name,
+                tensor_parallel_size=self.tensor_parallel_size,
+                gpu_memory_utilization=gpu_memory_utilization,
+            )
         else:
             logger.info("vLLM runner initialized in fallback mode")
 
@@ -123,16 +127,22 @@ class VLLMLocalRunner:
             return
 
         # Safety checks
-        if not getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)):
+        if not getattr(
+            self.config.execution,
+            "enable_cuda",
+            getattr(self.config.execution, "enable_gpu", False),
+        ):
             logger.warning("vLLM requires CUDA but CUDA is disabled")
             self.available = False
             return
 
         try:
             with time_operation(f"vllm_model_loading_{self.model_name}"):
-                logger.info("Loading vLLM model",
-                           model_name=self.model_name,
-                           tensor_parallel_size=self.tensor_parallel_size)
+                logger.info(
+                    "Loading vLLM model",
+                    model_name=self.model_name,
+                    tensor_parallel_size=self.tensor_parallel_size,
+                )
 
                 # Create vLLM engine
                 self.llm = LLM(
@@ -143,26 +153,26 @@ class VLLMLocalRunner:
                     enforce_eager=self.enforce_eager,
                     trust_remote_code=False,  # Safety: no remote code
                     disable_log_stats=False,
-                    disable_log_requests=False
+                    disable_log_requests=False,
                 )
 
                 self.is_loaded = True
 
-                logger.info("vLLM model loaded successfully",
-                           model_name=self.model_name,
-                           max_model_len=self.max_model_len)
+                logger.info(
+                    "vLLM model loaded successfully",
+                    model_name=self.model_name,
+                    max_model_len=self.max_model_len,
+                )
 
         except Exception as e:
-            logger.error("Failed to load vLLM model",
-                        model_name=self.model_name,
-                        error=str(e))
+            logger.error("Failed to load vLLM model", model_name=self.model_name, error=str(e))
             self.available = False
             raise
 
     @DryRunGuard.protect
-    def generate(self,
-                prompts: Union[str, List[str]],
-                sampling_params: Optional[SamplingParams] = None) -> Union[VLLMGenerationResult, List[VLLMGenerationResult]]:
+    def generate(
+        self, prompts: Union[str, List[str]], sampling_params: Optional[SamplingParams] = None
+    ) -> Union[VLLMGenerationResult, List[VLLMGenerationResult]]:
         """
         Generate text using vLLM.
 
@@ -197,10 +207,12 @@ class VLLMLocalRunner:
             start_time = time.time()
 
             try:
-                logger.info("Starting vLLM generation",
-                           batch_size=len(prompts),
-                           max_tokens=sampling_params.max_tokens,
-                           temperature=sampling_params.temperature)
+                logger.info(
+                    "Starting vLLM generation",
+                    batch_size=len(prompts),
+                    max_tokens=sampling_params.max_tokens,
+                    temperature=sampling_params.temperature,
+                )
 
                 # Generate with vLLM
                 outputs = self.llm.generate(prompts, sampling_params)
@@ -214,7 +226,9 @@ class VLLMLocalRunner:
                     tokens_generated = len(output.outputs[0].token_ids)
                     finish_reason = output.outputs[0].finish_reason
 
-                    tokens_per_second = tokens_generated / (generation_time / 1000) if generation_time > 0 else 0
+                    tokens_per_second = (
+                        tokens_generated / (generation_time / 1000) if generation_time > 0 else 0
+                    )
 
                     result = VLLMGenerationResult(
                         prompt=prompt,
@@ -229,18 +243,20 @@ class VLLMLocalRunner:
                             "sampling_params": {
                                 "temperature": sampling_params.temperature,
                                 "top_p": sampling_params.top_p,
-                                "max_tokens": sampling_params.max_tokens
-                            }
-                        }
+                                "max_tokens": sampling_params.max_tokens,
+                            },
+                        },
                     )
 
                     results.append(result)
 
-                    logger.debug("vLLM generation completed",
-                               prompt_length=len(prompt),
-                               tokens_generated=tokens_generated,
-                               finish_reason=finish_reason,
-                               tokens_per_second=tokens_per_second)
+                    logger.debug(
+                        "vLLM generation completed",
+                        prompt_length=len(prompt),
+                        tokens_generated=tokens_generated,
+                        finish_reason=finish_reason,
+                        tokens_per_second=tokens_per_second,
+                    )
 
                 # Update statistics
                 with self.lock:
@@ -248,10 +264,12 @@ class VLLMLocalRunner:
                     self.total_tokens_generated += sum(r.tokens_generated for r in results)
                     self.total_generation_time += generation_time
 
-                logger.info("vLLM batch generation completed",
-                           batch_size=len(prompts),
-                           total_tokens=sum(r.tokens_generated for r in results),
-                           total_time_ms=generation_time)
+                logger.info(
+                    "vLLM batch generation completed",
+                    batch_size=len(prompts),
+                    total_tokens=sum(r.tokens_generated for r in results),
+                    total_time_ms=generation_time,
+                )
 
             except Exception as e:
                 logger.error("vLLM generation failed", error=str(e))
@@ -265,17 +283,19 @@ class VLLMLocalRunner:
                         generation_time_ms=0.0,
                         tokens_per_second=0.0,
                         finish_reason="error",
-                        metadata={"error": str(e)}
+                        metadata={"error": str(e)},
                     )
                     results.append(result)
 
         return results[0] if single_prompt else results
 
-    def create_sampling_params(self,
-                             temperature: float = 0.7,
-                             top_p: float = 0.9,
-                             max_tokens: int = 50,
-                             stop: Optional[List[str]] = None) -> Optional[SamplingParams]:
+    def create_sampling_params(
+        self,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        max_tokens: int = 50,
+        stop: Optional[List[str]] = None,
+    ) -> Optional[SamplingParams]:
         """
         Create sampling parameters for generation.
 
@@ -292,10 +312,7 @@ class VLLMLocalRunner:
             return None
 
         return SamplingParams(
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-            stop=stop
+            temperature=temperature, top_p=top_p, max_tokens=max_tokens, stop=stop
         )
 
     def get_stats(self) -> Dict[str, Any]:
@@ -304,14 +321,15 @@ class VLLMLocalRunner:
             return {
                 "runner_type": "vllm_local",
                 "available": False,
-                "error": "vLLM not installed or not available"
+                "error": "vLLM not installed or not available",
             }
 
         with self.lock:
-            avg_generation_time = (self.total_generation_time / max(self.total_requests, 1))
-            avg_tokens_per_request = (self.total_tokens_generated / max(self.total_requests, 1))
-            avg_tokens_per_second = (self.total_tokens_generated /
-                                   max(self.total_generation_time / 1000, 0.001))
+            avg_generation_time = self.total_generation_time / max(self.total_requests, 1)
+            avg_tokens_per_request = self.total_tokens_generated / max(self.total_requests, 1)
+            avg_tokens_per_second = self.total_tokens_generated / max(
+                self.total_generation_time / 1000, 0.001
+            )
 
             return {
                 "runner_type": "vllm_local",
@@ -328,8 +346,8 @@ class VLLMLocalRunner:
                     "tensor_parallel_size": self.tensor_parallel_size,
                     "gpu_memory_utilization": self.gpu_memory_utilization,
                     "max_model_len": self.max_model_len,
-                    "enforce_eager": self.enforce_eager
-                }
+                    "enforce_eager": self.enforce_eager,
+                },
             }
 
     def get_model_info(self) -> Dict[str, Any]:
@@ -344,7 +362,7 @@ class VLLMLocalRunner:
                 "tensor_parallel_size": self.tensor_parallel_size,
                 "max_model_len": self.max_model_len,
                 "loaded": self.is_loaded,
-                "engine_type": "vllm"
+                "engine_type": "vllm",
             }
         except Exception as e:
             return {"error": str(e)}
@@ -365,6 +383,7 @@ class VLLMLocalRunner:
             # Clear CUDA cache
             try:
                 import torch
+
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
             except ImportError:
@@ -406,17 +425,14 @@ You can use the HuggingFace runner as an alternative.
 # Convenience function to check vLLM availability
 def check_vllm_availability() -> Dict[str, Any]:
     """Check if vLLM is available and properly configured."""
-    result = {
-        "vllm_available": VLLM_AVAILABLE,
-        "cuda_available": False,
-        "recommendations": []
-    }
+    result = {"vllm_available": VLLM_AVAILABLE, "cuda_available": False, "recommendations": []}
 
     if not VLLM_AVAILABLE:
         result["recommendations"].append("Install vLLM: pip install vllm")
 
     try:
         import torch
+
         result["cuda_available"] = torch.cuda.is_available()
         if not result["cuda_available"]:
             result["recommendations"].append("CUDA not available - vLLM requires GPU")

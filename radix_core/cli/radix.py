@@ -12,16 +12,16 @@ Usage:
 import json
 
 import typer
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from ..config import get_config
-from ..types import Job, ResourceRequirements
-from ..dryrun import DryRunGuard
 from ..cost_simulator import CostSimulator
+from ..dryrun import DryRunGuard
 from ..errors import RadixError, SafetyViolationError
+from ..types import Job, ResourceRequirements
 
 console = Console()
 cli = typer.Typer(
@@ -83,14 +83,9 @@ def submit(
     memory: int = typer.Option(512, "--memory", "-m", help="Memory in MB"),
     gpus: int = typer.Option(0, "--gpus", help="GPUs required"),
     priority: int = typer.Option(0, "--priority", "-p", help="Job priority (higher = more urgent)"),
-    dry_run: bool = typer.Option(True, "--dry-run/--no-dry-run", help="Dry-run mode (always on)"),
 ):
     """Submit a job for scheduling and execution."""
     config = get_config()
-
-    if not dry_run:
-        console.print("[red]Error:[/red] dry-run mode cannot be disabled for safety.")
-        raise typer.Exit(code=1)
 
     try:
         requirements = ResourceRequirements(
@@ -183,14 +178,16 @@ def plan(
             console.print(json.dumps(plan_data, indent=2))
         else:
             # Display plan
-            console.print(Panel(
-                f"Plan ID: {execution_plan.plan_id}\n"
-                f"Planner: {planner_type}\n"
-                f"Jobs: {len(execution_plan.scheduled_jobs)}\n"
-                f"Dependencies resolved: {execution_plan.dependencies_resolved}",
-                title="Execution Plan",
-                border_style="yellow",
-            ))
+            console.print(
+                Panel(
+                    f"Plan ID: {execution_plan.plan_id}\n"
+                    f"Planner: {planner_type}\n"
+                    f"Jobs: {len(execution_plan.scheduled_jobs)}\n"
+                    f"Dependencies resolved: {execution_plan.dependencies_resolved}",
+                    title="Execution Plan",
+                    border_style="yellow",
+                )
+            )
 
             table = Table(title="Scheduled Jobs", box=box.ROUNDED)
             table.add_column("#", style="dim")
@@ -231,11 +228,13 @@ def plan(
 def info():
     """Show detailed system information including available components."""
     # Version info
-    console.print(Panel(
-        "radix-core v0.1.0\nGPU Orchestration Platform",
-        title="Radix Core",
-        border_style="magenta",
-    ))
+    console.print(
+        Panel(
+            "radix-core v0.1.0\nGPU Orchestration Platform",
+            title="Radix Core",
+            border_style="magenta",
+        )
+    )
 
     # Components table
     table = Table(title="Available Components", box=box.ROUNDED)
@@ -259,18 +258,23 @@ def info():
 
     try:
         import ray
+
         table.add_row("Ray Local", "[green]available[/green]", f"Ray {ray.__version__}")
     except ImportError:
         table.add_row("Ray Local", "[yellow]not installed[/yellow]", "pip install ray[default]")
 
     try:
         import transformers
-        table.add_row("HuggingFace", "[green]available[/green]", f"transformers {transformers.__version__}")
+
+        table.add_row(
+            "HuggingFace", "[green]available[/green]", f"transformers {transformers.__version__}"
+        )
     except ImportError:
         table.add_row("HuggingFace", "[yellow]not installed[/yellow]", "pip install transformers")
 
     try:
         from vllm import __version__ as vllm_ver
+
         table.add_row("vLLM", "[green]available[/green]", f"vLLM {vllm_ver}")
     except ImportError:
         table.add_row("vLLM", "[yellow]not installed[/yellow]", "pip install vllm")

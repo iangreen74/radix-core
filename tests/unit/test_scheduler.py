@@ -2,15 +2,21 @@
 
 import pytest
 
-from radix_core.types import Job, ResourceRequirements
-from radix_core.scheduler.policies import (
-    FIFOPolicy, PriorityPolicy, FairSharePolicy, ShortestJobFirstPolicy,
+from radix_core.scheduler.job_graph import JobGraph
+from radix_core.scheduler.placement import (
+    LoadBalancedPlacement,
+    LocalPlacement,
+    ResourceNode,
+    get_placement_strategy,
 )
 from radix_core.scheduler.planner import GreedyPlanner, OptimalPlanner, get_planner
-from radix_core.scheduler.placement import (
-    LocalPlacement, LoadBalancedPlacement, ResourceNode, get_placement_strategy,
+from radix_core.scheduler.policies import (
+    FairSharePolicy,
+    FIFOPolicy,
+    PriorityPolicy,
+    ShortestJobFirstPolicy,
 )
-from radix_core.scheduler.job_graph import JobGraph
+from radix_core.types import Job, ResourceRequirements
 
 
 class TestFIFOPolicy:
@@ -34,7 +40,9 @@ class TestFIFOPolicy:
 
     def test_skips_infeasible_jobs(self):
         policy = FIFOPolicy()
-        big_job = Job(command="echo", requirements=ResourceRequirements(cpu_cores=100.0, memory_mb=512))
+        big_job = Job(
+            command="echo", requirements=ResourceRequirements(cpu_cores=100.0, memory_mb=512)
+        )
         tiny_res = ResourceRequirements(cpu_cores=1.0, memory_mb=256)
         decisions = policy.select_jobs([big_job], tiny_res)
         assert decisions == []
@@ -73,8 +81,12 @@ class TestFairSharePolicy:
 class TestShortestJobFirstPolicy:
     def test_shortest_first(self, available_resources):
         policy = ShortestJobFirstPolicy()
-        small = Job(command="echo s", requirements=ResourceRequirements(cpu_cores=1.0, memory_mb=256))
-        big = Job(command="echo b", requirements=ResourceRequirements(cpu_cores=4.0, memory_mb=4096))
+        small = Job(
+            command="echo s", requirements=ResourceRequirements(cpu_cores=1.0, memory_mb=256)
+        )
+        big = Job(
+            command="echo b", requirements=ResourceRequirements(cpu_cores=4.0, memory_mb=4096)
+        )
         decisions = policy.select_jobs([big, small], available_resources)
         assert len(decisions) == 2
         # SJF: shorter estimated duration first
@@ -134,7 +146,9 @@ class TestLocalPlacement:
 
     def test_resource_overflow(self):
         strategy = LocalPlacement()
-        huge = Job(command="echo", requirements=ResourceRequirements(cpu_cores=999.0, memory_mb=512))
+        huge = Job(
+            command="echo", requirements=ResourceRequirements(cpu_cores=999.0, memory_mb=512)
+        )
         plan = strategy.place_jobs([huge])
         assert len(plan.placements) == 0
         assert len(plan.unplaceable_jobs) == 1
@@ -152,8 +166,13 @@ class TestLoadBalancedPlacement:
     def test_custom_nodes(self, sample_job):
         nodes = [
             ResourceNode(
-                node_id="n1", available_cpu=8.0, available_memory=16384.0,
-                available_gpu=0, total_cpu=8.0, total_memory=16384.0, total_gpu=0,
+                node_id="n1",
+                available_cpu=8.0,
+                available_memory=16384.0,
+                available_gpu=0,
+                total_cpu=8.0,
+                total_memory=16384.0,
+                total_gpu=0,
             ),
         ]
         strategy = LoadBalancedPlacement()

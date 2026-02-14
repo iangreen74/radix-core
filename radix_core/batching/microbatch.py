@@ -6,19 +6,19 @@ based on tensor size estimation and memory constraints.
 """
 
 import time
-from typing import List, Dict, Any, Optional, Callable, TypeVar, Generic
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 from ..config import get_config
+from ..dryrun import DryRunGuard
 from ..logging import get_logger
 from ..utils.timers import time_operation
-from ..dryrun import DryRunGuard
 
 logger = get_logger(__name__)
 
-T = TypeVar('T')
-R = TypeVar('R')
+T = TypeVar("T")
+R = TypeVar("R")
 
 
 @dataclass
@@ -40,17 +40,17 @@ class TensorSizeEstimator(ABC):
     """Abstract base class for estimating tensor memory usage."""
 
     @abstractmethod
-    def estimate_input_size(self, data: T) -> float:
+    def estimate_input_size(self, data: Any) -> float:
         """Estimate input tensor size in MB."""
         pass
 
     @abstractmethod
-    def estimate_output_size(self, data: T) -> float:
+    def estimate_output_size(self, data: Any) -> float:
         """Estimate output tensor size in MB."""
         pass
 
     @abstractmethod
-    def estimate_intermediate_size(self, data: T) -> float:
+    def estimate_intermediate_size(self, data: Any) -> float:
         """Estimate intermediate computation size in MB."""
         pass
 
@@ -67,7 +67,7 @@ class TensorSizeEstimator(ABC):
             input_size_mb=input_size,
             intermediate_size_mb=intermediate_size,
             output_size_mb=output_size,
-            peak_size_mb=peak_size
+            peak_size_mb=peak_size,
         )
 
 
@@ -79,12 +79,7 @@ class TextTensorEstimator(TensorSizeEstimator):
         self.precision = precision
 
         # Bytes per parameter based on precision
-        self.bytes_per_param = {
-            "fp32": 4,
-            "fp16": 2,
-            "bf16": 2,
-            "int8": 1
-        }.get(precision, 2)
+        self.bytes_per_param = {"fp32": 4, "fp16": 2, "bf16": 2, "int8": 1}.get(precision, 2)
 
         # Model-specific parameters (rough estimates)
         self.model_params = {
@@ -140,12 +135,7 @@ class EmbeddingTensorEstimator(TensorSizeEstimator):
 
     def __init__(self, embedding_dim: int = 768, precision: str = "fp16"):
         self.embedding_dim = embedding_dim
-        self.bytes_per_param = {
-            "fp32": 4,
-            "fp16": 2,
-            "bf16": 2,
-            "int8": 1
-        }.get(precision, 2)
+        self.bytes_per_param = {"fp32": 4, "fp16": 2, "bf16": 2, "int8": 1}.get(precision, 2)
 
     def estimate_input_size(self, text: str) -> float:
         """Estimate input size for embedding."""
@@ -185,12 +175,14 @@ class MicrobatchProcessor(Generic[T, R]):
     based on memory constraints and tensor size estimation.
     """
 
-    def __init__(self,
-                 processor: Callable[[List[T]], List[R]],
-                 size_estimator: TensorSizeEstimator,
-                 max_memory_mb: float = None,
-                 min_microbatch_size: int = 1,
-                 max_microbatch_size: int = None):
+    def __init__(
+        self,
+        processor: Callable[[List[T]], List[R]],
+        size_estimator: TensorSizeEstimator,
+        max_memory_mb: float = None,
+        min_microbatch_size: int = 1,
+        max_microbatch_size: int = None,
+    ):
         """
         Initialize microbatch processor.
 
@@ -208,7 +200,9 @@ class MicrobatchProcessor(Generic[T, R]):
         # Memory configuration
         self.max_memory_mb = max_memory_mb or self._estimate_available_memory()
         self.min_microbatch_size = min_microbatch_size
-        self.max_microbatch_size = max_microbatch_size or getattr(getattr(self.config, 'batching', None), 'microbatch_size', 8)
+        self.max_microbatch_size = max_microbatch_size or getattr(
+            getattr(self.config, "batching", None), "microbatch_size", 8
+        )
 
         # Statistics
         self.total_batches = 0
@@ -220,9 +214,10 @@ class MicrobatchProcessor(Generic[T, R]):
         """Estimate available memory for microbatching."""
         try:
             import psutil
+
             # Use 25% of available system memory as a conservative estimate
             available_mb = psutil.virtual_memory().available / (1024 * 1024)
-            return available_mb * 0.25
+            return float(available_mb * 0.25)
         except ImportError:
             # Fallback to conservative estimate
             return 1024.0  # 1GB default
@@ -245,10 +240,12 @@ class MicrobatchProcessor(Generic[T, R]):
             # Fragment batch into microbatches
             microbatches = self._fragment_batch(batch)
 
-            logger.info("Processing batch with microbatches",
-                       batch_size=len(batch),
-                       num_microbatches=len(microbatches),
-                       max_memory_mb=self.max_memory_mb)
+            logger.info(
+                "Processing batch with microbatches",
+                batch_size=len(batch),
+                num_microbatches=len(microbatches),
+                max_memory_mb=self.max_memory_mb,
+            )
 
             # Process each microbatch
             all_results = []
@@ -262,16 +259,22 @@ class MicrobatchProcessor(Generic[T, R]):
                         all_results.extend(result.results)
                         total_processing_time += result.processing_time_ms
                     else:
-                        logger.error("Microbatch processing failed",
-                                   microbatch_id=result.microbatch_id,
-                                   error=result.error)
-                        raise RuntimeError(f"Microbatch {result.microbatch_id} failed: {result.error}")
+                        logger.error(
+                            "Microbatch processing failed",
+                            microbatch_id=result.microbatch_id,
+                            error=result.error,
+                        )
+                        raise RuntimeError(
+                            f"Microbatch {result.microbatch_id} failed: {result.error}"
+                        )
 
                 except Exception as e:
-                    logger.error("Error processing microbatch",
-                               microbatch_index=i,
-                               microbatch_size=len(microbatch),
-                               error=str(e))
+                    logger.error(
+                        "Error processing microbatch",
+                        microbatch_index=i,
+                        microbatch_size=len(microbatch),
+                        error=str(e),
+                    )
                     raise
 
             # Update statistics
@@ -279,11 +282,13 @@ class MicrobatchProcessor(Generic[T, R]):
             self.total_microbatches += len(microbatches)
             self.total_processing_time += total_processing_time
 
-            logger.info("Batch processing completed",
-                       batch_size=len(batch),
-                       num_microbatches=len(microbatches),
-                       total_processing_time_ms=total_processing_time,
-                       results_count=len(all_results))
+            logger.info(
+                "Batch processing completed",
+                batch_size=len(batch),
+                num_microbatches=len(microbatches),
+                total_processing_time_ms=total_processing_time,
+                results_count=len(all_results),
+            )
 
             return all_results
 
@@ -293,7 +298,7 @@ class MicrobatchProcessor(Generic[T, R]):
             return [batch]
 
         microbatches = []
-        current_microbatch = []
+        current_microbatch: List[T] = []
         current_memory = 0.0
 
         for item in batch:
@@ -301,15 +306,20 @@ class MicrobatchProcessor(Generic[T, R]):
             item_memory = self.size_estimator.estimate_batch_memory([item]).peak_size_mb
 
             # Check if adding this item would exceed memory limit
-            if (current_memory + item_memory > self.max_memory_mb and
-                len(current_microbatch) >= self.min_microbatch_size):
+            if (
+                current_memory + item_memory > self.max_memory_mb
+                and len(current_microbatch) >= self.min_microbatch_size
+            ):
 
                 # Start new microbatch
                 microbatches.append(current_microbatch)
                 current_microbatch = [item]
                 current_memory = item_memory
 
-            elif len(current_microbatch) >= self.max_microbatch_size:
+            elif (
+                self.max_microbatch_size is not None
+                and len(current_microbatch) >= self.max_microbatch_size
+            ):
                 # Microbatch size limit reached
                 microbatches.append(current_microbatch)
                 current_microbatch = [item]
@@ -327,15 +337,16 @@ class MicrobatchProcessor(Generic[T, R]):
         # Log fragmentation details
         sizes = [len(mb) for mb in microbatches]
         memory_estimates = [
-            self.size_estimator.estimate_batch_memory(mb).peak_size_mb
-            for mb in microbatches
+            self.size_estimator.estimate_batch_memory(mb).peak_size_mb for mb in microbatches
         ]
 
-        logger.debug("Batch fragmented into microbatches",
-                    original_size=len(batch),
-                    num_microbatches=len(microbatches),
-                    microbatch_sizes=sizes,
-                    memory_estimates_mb=memory_estimates)
+        logger.debug(
+            "Batch fragmented into microbatches",
+            original_size=len(batch),
+            num_microbatches=len(microbatches),
+            microbatch_sizes=sizes,
+            memory_estimates_mb=memory_estimates,
+        )
 
         return microbatches
 
@@ -347,10 +358,12 @@ class MicrobatchProcessor(Generic[T, R]):
             # Estimate memory usage
             memory_estimate = self.size_estimator.estimate_batch_memory(microbatch)
 
-            logger.debug("Processing microbatch",
-                        microbatch_id=microbatch_id,
-                        size=len(microbatch),
-                        estimated_memory_mb=memory_estimate.peak_size_mb)
+            logger.debug(
+                "Processing microbatch",
+                microbatch_id=microbatch_id,
+                size=len(microbatch),
+                estimated_memory_mb=memory_estimate.peak_size_mb,
+            )
 
             # Process the microbatch
             results = self.processor(microbatch)
@@ -362,7 +375,7 @@ class MicrobatchProcessor(Generic[T, R]):
                 results=results,
                 processing_time_ms=processing_time_ms,
                 memory_used_mb=memory_estimate.peak_size_mb,
-                success=True
+                success=True,
             )
 
         except Exception as e:
@@ -374,16 +387,20 @@ class MicrobatchProcessor(Generic[T, R]):
                 processing_time_ms=processing_time_ms,
                 memory_used_mb=0.0,
                 success=False,
-                error=str(e)
+                error=str(e),
             )
 
     def get_stats(self) -> Dict[str, Any]:
         """Get microbatch processor statistics."""
-        avg_processing_time = (self.total_processing_time / self.total_microbatches
-                             if self.total_microbatches > 0 else 0)
+        avg_processing_time = (
+            self.total_processing_time / self.total_microbatches
+            if self.total_microbatches > 0
+            else 0
+        )
 
-        avg_microbatches_per_batch = (self.total_microbatches / self.total_batches
-                                    if self.total_batches > 0 else 0)
+        avg_microbatches_per_batch = (
+            self.total_microbatches / self.total_batches if self.total_batches > 0 else 0
+        )
 
         return {
             "total_batches": self.total_batches,
@@ -394,8 +411,8 @@ class MicrobatchProcessor(Generic[T, R]):
             "config": {
                 "max_memory_mb": self.max_memory_mb,
                 "min_microbatch_size": self.min_microbatch_size,
-                "max_microbatch_size": self.max_microbatch_size
-            }
+                "max_microbatch_size": self.max_microbatch_size,
+            },
         }
 
     def reset_stats(self):
@@ -410,16 +427,14 @@ def create_text_microbatch_processor(
     processor: Callable[[List[str]], List[str]],
     model_name: str = "gpt2",
     precision: str = "fp16",
-    max_memory_mb: float = None
+    max_memory_mb: float = None,
 ) -> MicrobatchProcessor[str, str]:
     """Create a microbatch processor optimized for text processing."""
 
     estimator = TextTensorEstimator(model_name=model_name, precision=precision)
 
     return MicrobatchProcessor(
-        processor=processor,
-        size_estimator=estimator,
-        max_memory_mb=max_memory_mb
+        processor=processor, size_estimator=estimator, max_memory_mb=max_memory_mb
     )
 
 
@@ -427,14 +442,12 @@ def create_embedding_microbatch_processor(
     processor: Callable[[List[str]], List[List[float]]],
     embedding_dim: int = 768,
     precision: str = "fp16",
-    max_memory_mb: float = None
+    max_memory_mb: float = None,
 ) -> MicrobatchProcessor[str, List[float]]:
     """Create a microbatch processor optimized for embedding generation."""
 
     estimator = EmbeddingTensorEstimator(embedding_dim=embedding_dim, precision=precision)
 
     return MicrobatchProcessor(
-        processor=processor,
-        size_estimator=estimator,
-        max_memory_mb=max_memory_mb
+        processor=processor, size_estimator=estimator, max_memory_mb=max_memory_mb
     )

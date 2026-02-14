@@ -5,25 +5,27 @@ This module provides a thread pool executor that respects parallelism limits,
 cost guards, and safety constraints while providing comprehensive monitoring.
 """
 
+import queue
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor as StdThreadPoolExecutor, Future, as_completed
-from typing import Dict, List, Any, Optional, Callable, TypeVar, Generic
+from concurrent.futures import Future
+from concurrent.futures import ThreadPoolExecutor as StdThreadPoolExecutor
+from concurrent.futures import as_completed
 from dataclasses import dataclass
 from datetime import datetime
-import queue
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 from ..config import get_config
-from ..logging import get_logger
-from ..utils.timers import time_operation
-from ..utils.randfail import seeded_failure
 from ..dryrun import DryRunGuard
+from ..logging import get_logger
 from ..types import Job, JobResult, JobStatus
+from ..utils.randfail import seeded_failure
+from ..utils.timers import time_operation
 
 logger = get_logger(__name__)
 
-T = TypeVar('T')
-R = TypeVar('R')
+T = TypeVar("T")
+R = TypeVar("R")
 
 
 @dataclass
@@ -51,10 +53,12 @@ class ThreadPoolExecutor(Generic[T, R]):
     - Graceful shutdown handling
     """
 
-    def __init__(self,
-                 max_workers: Optional[int] = None,
-                 thread_name_prefix: str = "RadixWorker",
-                 enable_monitoring: bool = True):
+    def __init__(
+        self,
+        max_workers: Optional[int] = None,
+        thread_name_prefix: str = "RadixWorker",
+        enable_monitoring: bool = True,
+    ):
         """
         Initialize thread pool executor.
 
@@ -72,8 +76,7 @@ class ThreadPoolExecutor(Generic[T, R]):
 
         # Create underlying thread pool
         self.executor = StdThreadPoolExecutor(
-            max_workers=self.max_workers,
-            thread_name_prefix=thread_name_prefix
+            max_workers=self.max_workers, thread_name_prefix=thread_name_prefix
         )
 
         # Execution tracking
@@ -91,9 +94,11 @@ class ThreadPoolExecutor(Generic[T, R]):
         # Thread safety
         self.lock = threading.RLock()
 
-        logger.info("ThreadPool executor initialized",
-                   max_workers=self.max_workers,
-                   monitoring_enabled=enable_monitoring)
+        logger.info(
+            "ThreadPool executor initialized",
+            max_workers=self.max_workers,
+            monitoring_enabled=enable_monitoring,
+        )
 
     @DryRunGuard.protect
     def submit_job(self, job: Job, processor: Callable[[T], R]) -> Future[JobResult]:
@@ -113,7 +118,9 @@ class ThreadPoolExecutor(Generic[T, R]):
             # Check cost caps before submission
             estimated_cost = self._estimate_job_cost(job)
             if estimated_cost > self.config.safety.max_job_cost_usd:
-                raise ValueError(f"Job cost ${estimated_cost:.2f} exceeds cap ${self.config.safety.max_job_cost_usd:.2f}")
+                raise ValueError(
+                    f"Job cost ${estimated_cost:.2f} exceeds cap ${self.config.safety.max_job_cost_usd:.2f}"
+                )
 
             # Create execution context
             context = ExecutionContext(
@@ -122,16 +129,18 @@ class ThreadPoolExecutor(Generic[T, R]):
                 start_time=datetime.utcnow(),
                 estimated_duration=job.estimated_duration(),
                 resource_allocation=self._allocate_resources(job),
-                metadata={"estimated_cost_usd": estimated_cost}
+                metadata={"estimated_cost_usd": estimated_cost},
             )
 
             # Submit to thread pool
             future = self.executor.submit(self._execute_job, job, processor, context)
 
-            logger.info("Job submitted to thread pool",
-                       job_id=job.job_id,
-                       estimated_duration=context.estimated_duration,
-                       estimated_cost=estimated_cost)
+            logger.info(
+                "Job submitted to thread pool",
+                job_id=job.job_id,
+                estimated_duration=context.estimated_duration,
+                estimated_cost=estimated_cost,
+            )
 
             return future
 
@@ -152,14 +161,17 @@ class ThreadPoolExecutor(Generic[T, R]):
             future = self.submit_job(job, processor)
             futures.append(future)
 
-        logger.info("Batch of jobs submitted",
-                   batch_size=len(jobs),
-                   total_submitted=self.total_jobs_submitted)
+        logger.info(
+            "Batch of jobs submitted",
+            batch_size=len(jobs),
+            total_submitted=self.total_jobs_submitted,
+        )
 
         return futures
 
-    def wait_for_completion(self, futures: List[Future[JobResult]],
-                          timeout: Optional[float] = None) -> List[JobResult]:
+    def wait_for_completion(
+        self, futures: List[Future[JobResult]], timeout: Optional[float] = None
+    ) -> List[JobResult]:
         """
         Wait for all futures to complete and return results.
 
@@ -179,21 +191,21 @@ class ThreadPoolExecutor(Generic[T, R]):
                     results.append(result)
 
                     if result.succeeded:
-                        logger.debug("Job completed successfully",
-                                   job_id=result.job_id,
-                                   duration=result.duration_seconds)
+                        logger.debug(
+                            "Job completed successfully",
+                            job_id=result.job_id,
+                            duration=result.duration_seconds,
+                        )
                     else:
-                        logger.warning("Job failed",
-                                     job_id=result.job_id,
-                                     error=result.error_message)
+                        logger.warning(
+                            "Job failed", job_id=result.job_id, error=result.error_message
+                        )
 
                 except Exception as e:
                     logger.error("Error retrieving job result", error=str(e))
                     # Create failed result
                     failed_result = JobResult(
-                        job_id="unknown",
-                        status=JobStatus.FAILED,
-                        error_message=str(e)
+                        job_id="unknown", status=JobStatus.FAILED, error_message=str(e)
                     )
                     results.append(failed_result)
 
@@ -208,8 +220,9 @@ class ThreadPoolExecutor(Generic[T, R]):
         return results
 
     @DryRunGuard.protect
-    def _execute_job(self, job: Job, processor: Callable[[T], R],
-                    context: ExecutionContext) -> JobResult:
+    def _execute_job(
+        self, job: Job, processor: Callable[[T], R], context: ExecutionContext
+    ) -> JobResult:
         """Execute a single job with monitoring and safety guards."""
 
         # Update context with actual thread ID
@@ -226,10 +239,12 @@ class ThreadPoolExecutor(Generic[T, R]):
                 # Check for failure injection
                 seeded_failure(f"job_execution_{job.job_id}")
 
-                logger.info("Starting job execution",
-                           job_id=job.job_id,
-                           thread_id=context.thread_id,
-                           estimated_duration=context.estimated_duration)
+                logger.info(
+                    "Starting job execution",
+                    job_id=job.job_id,
+                    thread_id=context.thread_id,
+                    estimated_duration=context.estimated_duration,
+                )
 
                 # Execute the job
                 if job.function:
@@ -257,14 +272,13 @@ class ThreadPoolExecutor(Generic[T, R]):
                     metadata={
                         "thread_id": context.thread_id,
                         "estimated_cost_usd": context.metadata.get("estimated_cost_usd", 0.0),
-                        "actual_cost_usd": 0.0  # Always $0.00 in dry-run
-                    }
+                        "actual_cost_usd": 0.0,  # Always $0.00 in dry-run
+                    },
                 )
 
-                logger.info("Job execution completed",
-                           job_id=job.job_id,
-                           duration=duration,
-                           success=True)
+                logger.info(
+                    "Job execution completed", job_id=job.job_id, duration=duration, success=True
+                )
 
                 return result
 
@@ -272,10 +286,7 @@ class ThreadPoolExecutor(Generic[T, R]):
             end_time = time.time()
             duration = end_time - start_time
 
-            logger.error("Job execution failed",
-                        job_id=job.job_id,
-                        error=str(e),
-                        duration=duration)
+            logger.error("Job execution failed", job_id=job.job_id, error=str(e), duration=duration)
 
             # Create failed result
             result = JobResult(
@@ -290,8 +301,8 @@ class ThreadPoolExecutor(Generic[T, R]):
                 metadata={
                     "thread_id": context.thread_id,
                     "estimated_cost_usd": context.metadata.get("estimated_cost_usd", 0.0),
-                    "actual_cost_usd": 0.0
-                }
+                    "actual_cost_usd": 0.0,
+                },
             )
 
             return result
@@ -327,8 +338,8 @@ class ThreadPoolExecutor(Generic[T, R]):
 
         # Estimate based on duration and resource requirements
         duration_hours = job.estimated_duration() / 3600.0
-        cpu_rate = getattr(self.config.execution, 'cpu_cost_per_sec_usd', 0.0)
-        gpu_rate = getattr(self.config.execution, 'gpu_cost_per_sec_usd', 0.0)
+        cpu_rate = getattr(self.config.execution, "cpu_cost_per_sec_usd", 0.0)
+        gpu_rate = getattr(self.config.execution, "gpu_cost_per_sec_usd", 0.0)
         cpu_cost = job.requirements.cpu_cores * duration_hours * cpu_rate * 3600
         gpu_cost = job.requirements.gpu_count * duration_hours * gpu_rate * 3600
 
@@ -340,17 +351,16 @@ class ThreadPoolExecutor(Generic[T, R]):
             "cpu_cores": job.requirements.cpu_cores,
             "memory_mb": job.requirements.memory_mb,
             "gpu_count": job.requirements.gpu_count,
-            "thread_pool": self.thread_name_prefix
+            "thread_pool": self.thread_name_prefix,
         }
 
     def get_stats(self) -> Dict[str, Any]:
         """Get executor statistics."""
         with self.lock:
             active_job_count = len(self.active_jobs)
-            avg_execution_time = (self.total_execution_time / max(self.total_jobs_completed, 1))
+            avg_execution_time = self.total_execution_time / max(self.total_jobs_completed, 1)
 
-            success_rate = (self.total_jobs_completed /
-                          max(self.total_jobs_submitted, 1))
+            success_rate = self.total_jobs_completed / max(self.total_jobs_submitted, 1)
 
             return {
                 "executor_type": "threadpool",
@@ -363,7 +373,7 @@ class ThreadPoolExecutor(Generic[T, R]):
                 "peak_concurrent_jobs": self.peak_concurrent_jobs,
                 "avg_execution_time_seconds": avg_execution_time,
                 "total_execution_time_seconds": self.total_execution_time,
-                "monitoring_enabled": self.enable_monitoring
+                "monitoring_enabled": self.enable_monitoring,
             }
 
     def get_active_jobs(self) -> List[Dict[str, Any]]:
@@ -375,32 +385,41 @@ class ThreadPoolExecutor(Generic[T, R]):
             for job_id, context in self.active_jobs.items():
                 runtime = (current_time - context.start_time).total_seconds()
 
-                active_jobs.append({
-                    "job_id": job_id,
-                    "thread_id": context.thread_id,
-                    "start_time": context.start_time.isoformat(),
-                    "runtime_seconds": runtime,
-                    "estimated_duration": context.estimated_duration,
-                    "progress": min(runtime / context.estimated_duration, 1.0) if context.estimated_duration > 0 else 0.0,
-                    "resource_allocation": context.resource_allocation
-                })
+                active_jobs.append(
+                    {
+                        "job_id": job_id,
+                        "thread_id": context.thread_id,
+                        "start_time": context.start_time.isoformat(),
+                        "runtime_seconds": runtime,
+                        "estimated_duration": context.estimated_duration,
+                        "progress": (
+                            min(runtime / context.estimated_duration, 1.0)
+                            if context.estimated_duration > 0
+                            else 0.0
+                        ),
+                        "resource_allocation": context.resource_allocation,
+                    }
+                )
 
             return active_jobs
 
     def shutdown(self, wait: bool = True, timeout: Optional[float] = None):
         """Shutdown the executor gracefully."""
-        logger.info("Shutting down ThreadPool executor",
-                   active_jobs=len(self.active_jobs),
-                   wait=wait,
-                   timeout=timeout)
+        logger.info(
+            "Shutting down ThreadPool executor",
+            active_jobs=len(self.active_jobs),
+            wait=wait,
+            timeout=timeout,
+        )
 
         try:
             self.executor.shutdown(wait=wait, timeout=timeout)
 
             with self.lock:
                 if self.active_jobs:
-                    logger.warning("Executor shutdown with active jobs",
-                                 active_job_count=len(self.active_jobs))
+                    logger.warning(
+                        "Executor shutdown with active jobs", active_job_count=len(self.active_jobs)
+                    )
 
         except Exception as e:
             logger.error("Error during executor shutdown", error=str(e))

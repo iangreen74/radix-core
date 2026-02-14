@@ -6,15 +6,16 @@ Implements placement strategies for distributing jobs across available resources
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from ..types import Job
 from ..logging import get_logger
+from ..types import Job
 
 
 @dataclass
 class ResourceNode:
     """Represents a compute resource node."""
+
     node_id: str
     available_cpu: float
     available_memory: float  # in MB
@@ -29,6 +30,7 @@ class ResourceNode:
 @dataclass
 class JobPlacement:
     """Represents the placement of a job on a resource node."""
+
     job: Job
     node_id: str
     allocated_cpu: float
@@ -41,6 +43,7 @@ class JobPlacement:
 @dataclass
 class PlacementPlan:
     """Complete placement plan for a set of jobs."""
+
     plan_id: str
     placements: List[JobPlacement]
     unplaceable_jobs: List[Job] = field(default_factory=list)
@@ -56,16 +59,17 @@ class PlacementStrategy(ABC):
         self.logger = get_logger(f"radix.scheduler.placement.{name}")
 
     @abstractmethod
-    def place_jobs(self, jobs: List[Job],
-                   nodes: List[ResourceNode] = None) -> PlacementPlan:
+    def place_jobs(self, jobs: List[Job], nodes: List[ResourceNode] = None) -> PlacementPlan:
         """Place jobs on available resource nodes."""
         pass
 
     def can_place_job(self, job: Job, node: ResourceNode) -> bool:
         """Check if a job can be placed on a given node."""
-        return (node.available_cpu >= job.requirements.cpu_cores and
-                node.available_memory >= job.requirements.memory_mb and
-                node.available_gpu >= job.requirements.gpu_count)
+        return (
+            node.available_cpu >= job.requirements.cpu_cores
+            and node.available_memory >= job.requirements.memory_mb
+            and node.available_gpu >= job.requirements.gpu_count
+        )
 
     def calculate_placement_score(self, job: Job, node: ResourceNode) -> float:
         """Calculate a score for placing a job on a node."""
@@ -73,7 +77,11 @@ class PlacementStrategy(ABC):
         # Consider resource utilization efficiency
         cpu_util = job.requirements.cpu_cores / max(node.available_cpu, 1.0)
         memory_util = job.requirements.memory_mb / max(node.available_memory, 1.0)
-        gpu_util = job.requirements.gpu_count / max(node.available_gpu, 1.0) if node.available_gpu > 0 else 0.0
+        gpu_util = (
+            job.requirements.gpu_count / max(node.available_gpu, 1.0)
+            if node.available_gpu > 0
+            else 0.0
+        )
 
         # Prefer balanced utilization
         max_util = max(cpu_util, memory_util, gpu_util)
@@ -98,20 +106,17 @@ class LocalPlacement(PlacementStrategy):
             available_gpu=0,  # No GPU by default (safety)
             total_cpu=4.0,
             total_memory=8192.0,
-            total_gpu=0
+            total_gpu=0,
         )
 
-    def place_jobs(self, jobs: List[Job],
-                   nodes: List[ResourceNode] = None) -> PlacementPlan:
+    def place_jobs(self, jobs: List[Job], nodes: List[ResourceNode] = None) -> PlacementPlan:
         """Place jobs on local node."""
         if nodes is None:
             nodes = [self.local_node]
 
         if not nodes:
             return PlacementPlan(
-                plan_id=f"local_placement_{id(self)}",
-                placements=[],
-                unplaceable_jobs=jobs.copy()
+                plan_id=f"local_placement_{id(self)}", placements=[], unplaceable_jobs=jobs.copy()
             )
 
         # Use first available node (local placement)
@@ -130,9 +135,11 @@ class LocalPlacement(PlacementStrategy):
             remaining_memory = target_node.available_memory - allocated_memory
             remaining_gpu = target_node.available_gpu - allocated_gpu
 
-            if (job.requirements.cpu_cores <= remaining_cpu and
-                job.requirements.memory_mb <= remaining_memory and
-                job.requirements.gpu_count <= remaining_gpu):
+            if (
+                job.requirements.cpu_cores <= remaining_cpu
+                and job.requirements.memory_mb <= remaining_memory
+                and job.requirements.gpu_count <= remaining_gpu
+            ):
 
                 # Place the job
                 placement = JobPlacement(
@@ -141,7 +148,7 @@ class LocalPlacement(PlacementStrategy):
                     allocated_cpu=job.requirements.cpu_cores,
                     allocated_memory=job.requirements.memory_mb,
                     allocated_gpu=job.requirements.gpu_count,
-                    placement_score=1.0  # Simple scoring for local placement
+                    placement_score=1.0,  # Simple scoring for local placement
                 )
                 placements.append(placement)
 
@@ -161,20 +168,22 @@ class LocalPlacement(PlacementStrategy):
             resource_utilization={
                 "cpu_utilization": allocated_cpu / target_node.total_cpu,
                 "memory_utilization": allocated_memory / target_node.total_memory,
-                "gpu_utilization": allocated_gpu / max(target_node.total_gpu, 1)
+                "gpu_utilization": allocated_gpu / max(target_node.total_gpu, 1),
             },
             plan_metadata={
                 "strategy": "local",
                 "target_node": target_node.node_id,
                 "placed_jobs": len(placements),
-                "unplaced_jobs": len(unplaceable_jobs)
-            }
+                "unplaced_jobs": len(unplaceable_jobs),
+            },
         )
 
-        self.logger.info("Local placement completed",
-                        placed_jobs=len(placements),
-                        unplaced_jobs=len(unplaceable_jobs),
-                        cpu_utilization=plan.resource_utilization["cpu_utilization"])
+        self.logger.info(
+            "Local placement completed",
+            placed_jobs=len(placements),
+            unplaced_jobs=len(unplaceable_jobs),
+            cpu_utilization=plan.resource_utilization["cpu_utilization"],
+        )
 
         return plan
 
@@ -185,8 +194,7 @@ class LoadBalancedPlacement(PlacementStrategy):
     def __init__(self):
         super().__init__("load_balanced")
 
-    def place_jobs(self, jobs: List[Job],
-                   nodes: List[ResourceNode] = None) -> PlacementPlan:
+    def place_jobs(self, jobs: List[Job], nodes: List[ResourceNode] = None) -> PlacementPlan:
         """Place jobs using load balancing across nodes."""
         if not nodes:
             # Create default nodes for load balancing
@@ -198,7 +206,7 @@ class LoadBalancedPlacement(PlacementStrategy):
                     available_gpu=0,
                     total_cpu=4.0,
                     total_memory=8192.0,
-                    total_gpu=0
+                    total_gpu=0,
                 )
                 for i in range(3)  # Default 3 nodes
             ]
@@ -208,23 +216,22 @@ class LoadBalancedPlacement(PlacementStrategy):
 
         # Track allocated resources per node
         node_allocations = {
-            node.node_id: {
-                "cpu": 0.0,
-                "memory": 0.0,
-                "gpu": 0,
-                "load": node.current_load
-            }
+            node.node_id: {"cpu": 0.0, "memory": 0.0, "gpu": 0, "load": node.current_load}
             for node in nodes
         }
 
         # Sort jobs by resource requirements (largest first)
-        sorted_jobs = sorted(jobs, key=lambda j: (
-            j.requirements.cpu_cores + j.requirements.memory_mb + j.requirements.gpu_count
-        ), reverse=True)
+        sorted_jobs = sorted(
+            jobs,
+            key=lambda j: (
+                j.requirements.cpu_cores + j.requirements.memory_mb + j.requirements.gpu_count
+            ),
+            reverse=True,
+        )
 
         for job in sorted_jobs:
             best_node = None
-            best_score = -float('inf')
+            best_score = -float("inf")
 
             # Find the best node for this job
             for node in nodes:
@@ -235,9 +242,11 @@ class LoadBalancedPlacement(PlacementStrategy):
                 remaining_memory = node.available_memory - alloc["memory"]
                 remaining_gpu = node.available_gpu - alloc["gpu"]
 
-                if (job.requirements.cpu_cores <= remaining_cpu and
-                    job.requirements.memory_mb <= remaining_memory and
-                    job.requirements.gpu_count <= remaining_gpu):
+                if (
+                    job.requirements.cpu_cores <= remaining_cpu
+                    and job.requirements.memory_mb <= remaining_memory
+                    and job.requirements.gpu_count <= remaining_gpu
+                ):
 
                     # Calculate placement score
                     score = self.calculate_placement_score(job, node)
@@ -258,7 +267,7 @@ class LoadBalancedPlacement(PlacementStrategy):
                     allocated_cpu=job.requirements.cpu_cores,
                     allocated_memory=job.requirements.memory_mb,
                     allocated_gpu=job.requirements.gpu_count,
-                    placement_score=best_score
+                    placement_score=best_score,
                 )
                 placements.append(placement)
 
@@ -289,22 +298,24 @@ class LoadBalancedPlacement(PlacementStrategy):
             resource_utilization={
                 "cpu_utilization": total_cpu_used / max(total_cpu_available, 1),
                 "memory_utilization": total_memory_used / max(total_memory_available, 1),
-                "gpu_utilization": total_gpu_used / max(total_gpu_available, 1)
+                "gpu_utilization": total_gpu_used / max(total_gpu_available, 1),
             },
             plan_metadata={
                 "strategy": "load_balanced",
                 "node_count": len(nodes),
                 "placed_jobs": len(placements),
                 "unplaced_jobs": len(unplaceable_jobs),
-                "node_allocations": node_allocations
-            }
+                "node_allocations": node_allocations,
+            },
         )
 
-        self.logger.info("Load-balanced placement completed",
-                        placed_jobs=len(placements),
-                        unplaced_jobs=len(unplaceable_jobs),
-                        node_count=len(nodes),
-                        cpu_utilization=plan.resource_utilization["cpu_utilization"])
+        self.logger.info(
+            "Load-balanced placement completed",
+            placed_jobs=len(placements),
+            unplaced_jobs=len(unplaceable_jobs),
+            node_count=len(nodes),
+            cpu_utilization=plan.resource_utilization["cpu_utilization"],
+        )
 
         return plan
 

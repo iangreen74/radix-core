@@ -5,26 +5,28 @@ This module defines the fundamental data types used throughout the Radix
 system for job management, scheduling, and execution.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Dict, List, Any, Optional, Callable
-from datetime import datetime
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum, auto
+from typing import Any, Callable, Dict, List, Optional
 
 
 class JobStatus(Enum):
     """Status of a job in the system."""
-    PENDING = auto()      # Job created but not yet scheduled
-    SCHEDULED = auto()    # Job scheduled but not yet running
-    RUNNING = auto()      # Job currently executing
-    COMPLETED = auto()    # Job completed successfully
-    FAILED = auto()       # Job failed with error
-    CANCELLED = auto()    # Job cancelled by user or system
-    TIMEOUT = auto()      # Job exceeded time limit
+
+    PENDING = auto()  # Job created but not yet scheduled
+    SCHEDULED = auto()  # Job scheduled but not yet running
+    RUNNING = auto()  # Job currently executing
+    COMPLETED = auto()  # Job completed successfully
+    FAILED = auto()  # Job failed with error
+    CANCELLED = auto()  # Job cancelled by user or system
+    TIMEOUT = auto()  # Job exceeded time limit
 
 
 class ResourceType(Enum):
     """Types of computational resources."""
+
     CPU = auto()
     MEMORY = auto()
     GPU = auto()
@@ -34,6 +36,7 @@ class ResourceType(Enum):
 
 class ExecutorType(Enum):
     """Types of job executors."""
+
     LOCAL_SUBPROCESS = auto()
     THREADPOOL = auto()
     RAY_LOCAL = auto()
@@ -43,12 +46,12 @@ class ExecutorType(Enum):
 class ResourceRequirements:
     """Resource requirements for a job."""
 
-    cpu_cores: float = 1.0          # Number of CPU cores needed
-    memory_mb: int = 512            # Memory in megabytes
-    gpu_count: int = 0              # Number of GPUs needed
-    gpu_memory_mb: int = 0          # GPU memory in megabytes
-    storage_mb: int = 100           # Storage space in megabytes
-    network_mbps: float = 0.0       # Network bandwidth in Mbps
+    cpu_cores: float = 1.0  # Number of CPU cores needed
+    memory_mb: int = 512  # Memory in megabytes
+    gpu_count: int = 0  # Number of GPUs needed
+    gpu_memory_mb: int = 0  # GPU memory in megabytes
+    storage_mb: int = 100  # Storage space in megabytes
+    network_mbps: float = 0.0  # Network bandwidth in Mbps
 
     # Time limits
     max_runtime_seconds: Optional[int] = None
@@ -85,15 +88,15 @@ class ResourceRequirements:
         # In dry-run mode, all costs are $0.00
         return 0.0
 
-    def is_satisfied_by(self, available: 'ResourceRequirements') -> bool:
+    def is_satisfied_by(self, available: "ResourceRequirements") -> bool:
         """Check if requirements are satisfied by available resources."""
         return (
-            self.cpu_cores <= available.cpu_cores and
-            self.memory_mb <= available.memory_mb and
-            self.gpu_count <= available.gpu_count and
-            self.gpu_memory_mb <= available.gpu_memory_mb and
-            self.storage_mb <= available.storage_mb and
-            self.network_mbps <= available.network_mbps
+            self.cpu_cores <= available.cpu_cores
+            and self.memory_mb <= available.memory_mb
+            and self.gpu_count <= available.gpu_count
+            and self.gpu_memory_mb <= available.gpu_memory_mb
+            and self.storage_mb <= available.storage_mb
+            and self.network_mbps <= available.network_mbps
         )
 
 
@@ -163,26 +166,26 @@ class Job:
     def to_dict(self) -> Dict[str, Any]:
         """Convert job to dictionary representation."""
         return {
-            'job_id': self.job_id,
-            'name': self.name,
-            'description': self.description,
-            'command': self.command,
-            'args': self.args,
-            'kwargs': self.kwargs,
-            'requirements': {
-                'cpu_cores': self.requirements.cpu_cores,
-                'memory_mb': self.requirements.memory_mb,
-                'gpu_count': self.requirements.gpu_count,
-                'gpu_memory_mb': self.requirements.gpu_memory_mb,
-                'storage_mb': self.requirements.storage_mb,
-                'network_mbps': self.requirements.network_mbps,
-                'max_runtime_seconds': self.requirements.max_runtime_seconds
+            "job_id": self.job_id,
+            "name": self.name,
+            "description": self.description,
+            "command": self.command,
+            "args": self.args,
+            "kwargs": self.kwargs,
+            "requirements": {
+                "cpu_cores": self.requirements.cpu_cores,
+                "memory_mb": self.requirements.memory_mb,
+                "gpu_count": self.requirements.gpu_count,
+                "gpu_memory_mb": self.requirements.gpu_memory_mb,
+                "storage_mb": self.requirements.storage_mb,
+                "network_mbps": self.requirements.network_mbps,
+                "max_runtime_seconds": self.requirements.max_runtime_seconds,
             },
-            'priority': self.priority,
-            'dependencies': self.dependencies,
-            'tags': self.tags,
-            'created_at': self.created_at.isoformat(),
-            'status': self.status.name
+            "priority": self.priority,
+            "dependencies": self.dependencies,
+            "tags": self.tags,
+            "created_at": self.created_at.isoformat(),
+            "status": self.status.name,
         }
 
 
@@ -234,22 +237,22 @@ class JobResult:
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary representation."""
         return {
-            'job_id': self.job_id,
-            'status': self.status.name,
-            'start_time': self.start_time.isoformat() if self.start_time else None,
-            'end_time': self.end_time.isoformat() if self.end_time else None,
-            'duration_seconds': self.duration_seconds,
-            'executor_type': self.executor_type,
-            'node_id': self.node_id,
-            'return_code': self.return_code,
-            'stdout': self.stdout,
-            'stderr': self.stderr,
-            'cpu_time_seconds': self.cpu_time_seconds,
-            'memory_peak_mb': self.memory_peak_mb,
-            'gpu_time_seconds': self.gpu_time_seconds,
-            'error_message': self.error_message,
-            'succeeded': self.succeeded,
-            'metadata': self.metadata
+            "job_id": self.job_id,
+            "status": self.status.name,
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "duration_seconds": self.duration_seconds,
+            "executor_type": self.executor_type,
+            "node_id": self.node_id,
+            "return_code": self.return_code,
+            "stdout": self.stdout,
+            "stderr": self.stderr,
+            "cpu_time_seconds": self.cpu_time_seconds,
+            "memory_peak_mb": self.memory_peak_mb,
+            "gpu_time_seconds": self.gpu_time_seconds,
+            "error_message": self.error_message,
+            "succeeded": self.succeeded,
+            "metadata": self.metadata,
         }
 
 
@@ -279,10 +282,10 @@ class ResourceAllocation:
     def matches_requirements(self, requirements: ResourceRequirements) -> bool:
         """Check if allocation matches job requirements."""
         return (
-            self.cpu_cores >= requirements.cpu_cores and
-            self.memory_mb >= requirements.memory_mb and
-            len(self.gpu_indices) >= requirements.gpu_count and
-            self.gpu_memory_mb >= requirements.gpu_memory_mb
+            self.cpu_cores >= requirements.cpu_cores
+            and self.memory_mb >= requirements.memory_mb
+            and len(self.gpu_indices) >= requirements.gpu_count
+            and self.gpu_memory_mb >= requirements.gpu_memory_mb
         )
 
 
@@ -353,7 +356,7 @@ class SchedulePlan:
             gpu_count=total_gpu,
             gpu_memory_mb=total_gpu_memory,
             storage_mb=total_storage,
-            network_mbps=total_network
+            network_mbps=total_network,
         )
 
 
@@ -423,20 +426,20 @@ class ExecutionResult:
     def to_dict(self) -> Dict[str, Any]:
         """Convert execution result to dictionary."""
         return {
-            'plan_id': self.plan_id,
-            'total_jobs': self.total_jobs,
-            'completed_jobs': self.completed_jobs,
-            'failed_jobs': self.failed_jobs,
-            'cancelled_jobs': self.cancelled_jobs,
-            'success_rate': self.success_rate,
-            'start_time': self.start_time.isoformat(),
-            'end_time': self.end_time.isoformat() if self.end_time else None,
-            'duration_seconds': self.duration_seconds,
-            'total_cpu_time_seconds': self.total_cpu_time_seconds,
-            'total_memory_peak_mb': self.total_memory_peak_mb,
-            'total_gpu_time_seconds': self.total_gpu_time_seconds,
-            'actual_cost_usd': self.actual_cost_usd,
-            'is_complete': self.is_complete
+            "plan_id": self.plan_id,
+            "total_jobs": self.total_jobs,
+            "completed_jobs": self.completed_jobs,
+            "failed_jobs": self.failed_jobs,
+            "cancelled_jobs": self.cancelled_jobs,
+            "success_rate": self.success_rate,
+            "start_time": self.start_time.isoformat(),
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "duration_seconds": self.duration_seconds,
+            "total_cpu_time_seconds": self.total_cpu_time_seconds,
+            "total_memory_peak_mb": self.total_memory_peak_mb,
+            "total_gpu_time_seconds": self.total_gpu_time_seconds,
+            "actual_cost_usd": self.actual_cost_usd,
+            "is_complete": self.is_complete,
         }
 
 

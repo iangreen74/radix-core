@@ -9,12 +9,12 @@ scheduling and orchestration decisions.
 import uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Dict, List, Set, Optional, Tuple, Iterator
 from datetime import datetime
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 
-from ..types import Job, JobStatus, JobID
 from ..errors import DependencyError, ValidationError
 from ..logging import get_logger
+from ..types import Job, JobID, JobStatus
 
 logger = get_logger(__name__)
 
@@ -67,7 +67,7 @@ class JobEdge:
     from_job_id: JobID
     to_job_id: JobID
     edge_type: str = "dependency"  # Type of dependency
-    metadata: Dict[str, any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __hash__(self):
         return hash((self.from_job_id, self.to_job_id))
@@ -93,7 +93,7 @@ class JobGraph:
 
         # Metadata
         self.created_at = datetime.utcnow()
-        self.metadata: Dict[str, any] = {}
+        self.metadata: Dict[str, Any] = {}
 
     def add_job(self, job: Job) -> JobNode:
         """
@@ -110,8 +110,10 @@ class JobGraph:
         """
         if job.job_id in self.nodes:
             raise ValidationError(
-                "job_id", job.job_id, "unique job ID",
-                message=f"Job {job.job_id} already exists in graph"
+                "job_id",
+                job.job_id,
+                "unique job ID",
+                message=f"Job {job.job_id} already exists in graph",
             )
 
         node = JobNode(job=job)
@@ -127,10 +129,12 @@ class JobGraph:
 
         self._invalidate_caches()
 
-        logger.info("Job added to graph",
-                   job_id=job.job_id,
-                   graph_id=self.graph_id,
-                   dependencies=len(job.dependencies))
+        logger.info(
+            "Job added to graph",
+            job_id=job.job_id,
+            graph_id=self.graph_id,
+            dependencies=len(job.dependencies),
+        )
 
         return node
 
@@ -148,8 +152,9 @@ class JobGraph:
             return False
 
         # Remove all edges involving this job
-        edges_to_remove = {e for e in self.edges
-                          if e.from_job_id == job_id or e.to_job_id == job_id}
+        edges_to_remove = {
+            e for e in self.edges if e.from_job_id == job_id or e.to_job_id == job_id
+        }
 
         for edge in edges_to_remove:
             self.edges.remove(edge)
@@ -164,9 +169,7 @@ class JobGraph:
         del self.nodes[job_id]
         self._invalidate_caches()
 
-        logger.info("Job removed from graph",
-                   job_id=job_id,
-                   graph_id=self.graph_id)
+        logger.info("Job removed from graph", job_id=job_id, graph_id=self.graph_id)
 
         return True
 
@@ -186,28 +189,32 @@ class JobGraph:
         """
         if from_job_id not in self.nodes:
             raise ValidationError(
-                "from_job_id", from_job_id, "existing job ID",
-                message=f"Job {from_job_id} not found in graph"
+                "from_job_id",
+                from_job_id,
+                "existing job ID",
+                message=f"Job {from_job_id} not found in graph",
             )
 
         if to_job_id not in self.nodes:
             raise ValidationError(
-                "to_job_id", to_job_id, "existing job ID",
-                message=f"Job {to_job_id} not found in graph"
+                "to_job_id",
+                to_job_id,
+                "existing job ID",
+                message=f"Job {to_job_id} not found in graph",
             )
 
         # Check for self-dependency
         if from_job_id == to_job_id:
             raise ValidationError(
-                "dependency", f"{from_job_id} -> {to_job_id}", "non-self dependency",
-                message="Job cannot depend on itself"
+                "dependency",
+                f"{from_job_id} -> {to_job_id}",
+                "non-self dependency",
+                message="Job cannot depend on itself",
             )
 
         # Check if this would create a cycle
         if self._would_create_cycle(from_job_id, to_job_id):
-            logger.warning("Dependency would create cycle",
-                          from_job=from_job_id,
-                          to_job=to_job_id)
+            logger.warning("Dependency would create cycle", from_job=from_job_id, to_job=to_job_id)
             return False
 
         # Add the edge
@@ -220,10 +227,9 @@ class JobGraph:
 
         self._invalidate_caches()
 
-        logger.info("Dependency added",
-                   from_job=from_job_id,
-                   to_job=to_job_id,
-                   graph_id=self.graph_id)
+        logger.info(
+            "Dependency added", from_job=from_job_id, to_job=to_job_id, graph_id=self.graph_id
+        )
 
         return True
 
@@ -254,9 +260,7 @@ class JobGraph:
 
         self._invalidate_caches()
 
-        logger.info("Dependency removed",
-                   from_job=from_job_id,
-                   to_job=to_job_id)
+        logger.info("Dependency removed", from_job=from_job_id, to_job=to_job_id)
 
         return True
 
@@ -268,8 +272,11 @@ class JobGraph:
             List of jobs ready for execution
         """
         if self._ready_jobs_cache is None:
-            ready_job_ids = {job_id for job_id, node in self.nodes.items()
-                           if node.is_ready and node.job.status == JobStatus.PENDING}
+            ready_job_ids = {
+                job_id
+                for job_id, node in self.nodes.items()
+                if node.is_ready and node.job.status == JobStatus.PENDING
+            }
             self._ready_jobs_cache = ready_job_ids
 
         return [self.nodes[job_id].job for job_id in self._ready_jobs_cache]
@@ -312,8 +319,7 @@ class JobGraph:
         if len(result) != len(self.nodes):
             remaining_jobs = set(self.nodes.keys()) - set(result)
             raise DependencyError(
-                "graph", list(remaining_jobs),
-                message="Circular dependencies detected in job graph"
+                "graph", list(remaining_jobs), message="Circular dependencies detected in job graph"
             )
 
         self._topological_order = result
@@ -340,9 +346,7 @@ class JobGraph:
 
         self._invalidate_caches()
 
-        logger.info("Job marked completed",
-                   job_id=job_id,
-                   dependents=len(node.dependents))
+        logger.info("Job marked completed", job_id=job_id, dependents=len(node.dependents))
 
     def get_critical_path(self) -> Tuple[List[JobID], float]:
         """
@@ -353,8 +357,8 @@ class JobGraph:
         """
         # Calculate earliest start times using topological order
         topo_order = self.get_topological_order()
-        earliest_start = {}
-        earliest_finish = {}
+        earliest_start: Dict[str, float] = {}
+        earliest_finish: Dict[str, float] = {}
 
         for job_id in topo_order:
             job = self.nodes[job_id].job
@@ -376,12 +380,15 @@ class JobGraph:
         project_duration = max(earliest_finish.values())
 
         # Trace back the critical path
-        critical_path = []
+        critical_path: List[str] = []
         current_finish_time = project_duration
 
         # Start from jobs that finish at project completion time
-        remaining_jobs = set(job_id for job_id, finish_time in earliest_finish.items()
-                           if abs(finish_time - project_duration) < 0.001)
+        remaining_jobs = set(
+            job_id
+            for job_id, finish_time in earliest_finish.items()
+            if abs(finish_time - project_duration) < 0.001
+        )
 
         while remaining_jobs:
             # Find job on critical path
@@ -421,8 +428,9 @@ class JobGraph:
             if not current_level:
                 # This shouldn't happen if graph is acyclic
                 raise DependencyError(
-                    "graph", list(remaining_jobs),
-                    message="Unable to resolve dependencies - possible cycle"
+                    "graph",
+                    list(remaining_jobs),
+                    message="Unable to resolve dependencies - possible cycle",
                 )
 
             levels.append(current_level)
@@ -473,18 +481,21 @@ class JobGraph:
 
         return errors
 
-    def get_statistics(self) -> Dict[str, any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """Get statistics about the job graph."""
-        stats = {
-            'total_jobs': len(self.nodes),
-            'total_edges': len(self.edges),
-            'ready_jobs': len(self.get_ready_jobs()),
-            'completed_jobs': sum(1 for node in self.nodes.values()
-                                if node.job.status == JobStatus.COMPLETED),
-            'running_jobs': sum(1 for node in self.nodes.values()
-                              if node.job.status == JobStatus.RUNNING),
-            'failed_jobs': sum(1 for node in self.nodes.values()
-                             if node.job.status == JobStatus.FAILED),
+        stats: Dict[str, Any] = {
+            "total_jobs": len(self.nodes),
+            "total_edges": len(self.edges),
+            "ready_jobs": len(self.get_ready_jobs()),
+            "completed_jobs": sum(
+                1 for node in self.nodes.values() if node.job.status == JobStatus.COMPLETED
+            ),
+            "running_jobs": sum(
+                1 for node in self.nodes.values() if node.job.status == JobStatus.RUNNING
+            ),
+            "failed_jobs": sum(
+                1 for node in self.nodes.values() if node.job.status == JobStatus.FAILED
+            ),
         }
 
         # Calculate complexity metrics
@@ -492,69 +503,84 @@ class JobGraph:
             dependencies_per_job = [len(node.dependencies) for node in self.nodes.values()]
             dependents_per_job = [len(node.dependents) for node in self.nodes.values()]
 
-            stats.update({
-                'avg_dependencies_per_job': sum(dependencies_per_job) / len(dependencies_per_job),
-                'max_dependencies_per_job': max(dependencies_per_job),
-                'avg_dependents_per_job': sum(dependents_per_job) / len(dependents_per_job),
-                'max_dependents_per_job': max(dependents_per_job),
-            })
+            stats.update(
+                {
+                    "avg_dependencies_per_job": sum(dependencies_per_job)
+                    / len(dependencies_per_job),
+                    "max_dependencies_per_job": max(dependencies_per_job),
+                    "avg_dependents_per_job": sum(dependents_per_job) / len(dependents_per_job),
+                    "max_dependents_per_job": max(dependents_per_job),
+                }
+            )
 
             # Critical path analysis
             try:
                 critical_path, duration = self.get_critical_path()
-                stats.update({
-                    'critical_path_length': len(critical_path),
-                    'critical_path_duration': duration,
-                })
+                stats.update(
+                    {
+                        "critical_path_length": len(critical_path),
+                        "critical_path_duration": duration,
+                    }
+                )
             except Exception:
-                stats.update({
-                    'critical_path_length': 0,
-                    'critical_path_duration': 0.0,
-                })
+                stats.update(
+                    {
+                        "critical_path_length": 0,
+                        "critical_path_duration": 0.0,
+                    }
+                )
 
             # Parallel levels
             try:
                 levels = self.get_parallel_levels()
-                stats.update({
-                    'parallel_levels': len(levels),
-                    'max_parallel_jobs': max(len(level) for level in levels) if levels else 0,
-                })
+                stats.update(
+                    {
+                        "parallel_levels": len(levels),
+                        "max_parallel_jobs": max(len(level) for level in levels) if levels else 0,
+                    }
+                )
             except Exception:
-                stats.update({
-                    'parallel_levels': 0,
-                    'max_parallel_jobs': 0,
-                })
+                stats.update(
+                    {
+                        "parallel_levels": 0,
+                        "max_parallel_jobs": 0,
+                    }
+                )
 
         return stats
 
-    def to_dict(self) -> Dict[str, any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert job graph to dictionary representation."""
         return {
-            'graph_id': self.graph_id,
-            'created_at': self.created_at.isoformat(),
-            'metadata': self.metadata,
-            'nodes': {
+            "graph_id": self.graph_id,
+            "created_at": self.created_at.isoformat(),
+            "metadata": self.metadata,
+            "nodes": {
                 job_id: {
-                    'job': node.job.to_dict(),
-                    'dependencies': list(node.dependencies),
-                    'dependents': list(node.dependents),
-                    'ready_time': node.ready_time.isoformat() if node.ready_time else None,
-                    'scheduled_time': node.scheduled_time.isoformat() if node.scheduled_time else None,
-                    'start_time': node.start_time.isoformat() if node.start_time else None,
-                    'completion_time': node.completion_time.isoformat() if node.completion_time else None,
+                    "job": node.job.to_dict(),
+                    "dependencies": list(node.dependencies),
+                    "dependents": list(node.dependents),
+                    "ready_time": node.ready_time.isoformat() if node.ready_time else None,
+                    "scheduled_time": (
+                        node.scheduled_time.isoformat() if node.scheduled_time else None
+                    ),
+                    "start_time": node.start_time.isoformat() if node.start_time else None,
+                    "completion_time": (
+                        node.completion_time.isoformat() if node.completion_time else None
+                    ),
                 }
                 for job_id, node in self.nodes.items()
             },
-            'edges': [
+            "edges": [
                 {
-                    'from_job_id': edge.from_job_id,
-                    'to_job_id': edge.to_job_id,
-                    'edge_type': edge.edge_type,
-                    'metadata': edge.metadata
+                    "from_job_id": edge.from_job_id,
+                    "to_job_id": edge.to_job_id,
+                    "edge_type": edge.edge_type,
+                    "metadata": edge.metadata,
                 }
                 for edge in self.edges
             ],
-            'statistics': self.get_statistics()
+            "statistics": self.get_statistics(),
         }
 
     def _would_create_cycle(self, from_job_id: JobID, to_job_id: JobID) -> bool:

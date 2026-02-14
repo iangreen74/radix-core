@@ -1,10 +1,18 @@
 """Tests for error hierarchy."""
 
 import pytest
+
 from radix_core.errors import (
-    RadixError, SafetyViolationError, CostCapExceededError,
-    ConfigurationError, ExecutionError, SchedulingError,
-    ResourceError, DependencyError, raise_safety_violation, raise_cost_exceeded,
+    ConfigurationError,
+    CostCapExceededError,
+    DependencyError,
+    ExecutionError,
+    RadixError,
+    ResourceError,
+    SafetyViolationError,
+    SchedulingError,
+    raise_cost_exceeded,
+    raise_safety_violation,
 )
 
 

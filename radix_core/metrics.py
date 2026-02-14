@@ -5,15 +5,15 @@ Provides comprehensive metrics collection, aggregation, and analysis
 for GPU orchestration research with real-time monitoring capabilities.
 """
 
-import time
-import threading
-import statistics
 import json
+import statistics
+import threading
+import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Callable, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .config import get_config
 from .logging import get_logger
@@ -31,11 +31,7 @@ class MetricPoint:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
-        return {
-            'timestamp': self.timestamp.isoformat(),
-            'value': self.value,
-            'tags': self.tags
-        }
+        return {"timestamp": self.timestamp.isoformat(), "value": self.value, "tags": self.tags}
 
 
 @dataclass
@@ -57,18 +53,18 @@ class MetricSummary:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
         return {
-            'name': self.name,
-            'count': self.count,
-            'min_value': self.min_value,
-            'max_value': self.max_value,
-            'mean': self.mean,
-            'median': self.median,
-            'std_dev': self.std_dev,
-            'p95': self.p95,
-            'p99': self.p99,
-            'first_timestamp': self.first_timestamp.isoformat(),
-            'last_timestamp': self.last_timestamp.isoformat(),
-            'duration_seconds': (self.last_timestamp - self.first_timestamp).total_seconds()
+            "name": self.name,
+            "count": self.count,
+            "min_value": self.min_value,
+            "max_value": self.max_value,
+            "mean": self.mean,
+            "median": self.median,
+            "std_dev": self.std_dev,
+            "p95": self.p95,
+            "p99": self.p99,
+            "first_timestamp": self.first_timestamp.isoformat(),
+            "last_timestamp": self.last_timestamp.isoformat(),
+            "duration_seconds": (self.last_timestamp - self.first_timestamp).total_seconds(),
         }
 
 
@@ -134,7 +130,7 @@ class MetricsCollector:
             self.histograms[name].append(float(value))
             # Keep histogram size manageable
             if len(self.histograms[name]) > self.max_points_per_metric:
-                self.histograms[name] = self.histograms[name][-self.max_points_per_metric:]
+                self.histograms[name] = self.histograms[name][-self.max_points_per_metric :]
 
             self._add_metric_point(name, value, tags or {})
 
@@ -144,7 +140,7 @@ class MetricsCollector:
             self.timers[name].append(duration_seconds)
             # Keep timer history manageable
             if len(self.timers[name]) > self.max_points_per_metric:
-                self.timers[name] = self.timers[name][-self.max_points_per_metric:]
+                self.timers[name] = self.timers[name][-self.max_points_per_metric :]
 
             self._add_metric_point(f"{name}_duration", duration_seconds, tags or {})
 
@@ -194,7 +190,7 @@ class MetricsCollector:
                 p95=p95,
                 p99=p99,
                 first_timestamp=points[0].timestamp,
-                last_timestamp=points[-1].timestamp
+                last_timestamp=points[-1].timestamp,
             )
 
     def get_all_summaries(self) -> Dict[str, MetricSummary]:
@@ -222,27 +218,27 @@ class MetricsCollector:
     def export_metrics(self, filepath: str, format: str = "json"):
         """Export all metrics to a file."""
         export_data = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'format_version': '1.0',
-            'metrics': {},
-            'summaries': {}
+            "timestamp": datetime.utcnow().isoformat(),
+            "format_version": "1.0",
+            "metrics": {},
+            "summaries": {},
         }
 
         with self._lock:
             # Export raw metrics
             for name, points in self.metrics.items():
-                export_data['metrics'][name] = [p.to_dict() for p in points]
+                export_data["metrics"][name] = [p.to_dict() for p in points]
 
             # Export summaries
             for name, summary in self.get_all_summaries().items():
-                export_data['summaries'][name] = summary.to_dict()
+                export_data["summaries"][name] = summary.to_dict()
 
         # Write to file
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
 
         if format.lower() == "json":
-            with open(filepath, 'w') as f:
+            with open(filepath, "w") as f:
                 json.dump(export_data, f, indent=2)
         else:
             raise ValueError(f"Unsupported export format: {format}")
@@ -262,11 +258,7 @@ class MetricsCollector:
 
     def _add_metric_point(self, name: str, value: Union[int, float], tags: Dict[str, str]):
         """Add a metric point to the collection."""
-        point = MetricPoint(
-            timestamp=datetime.utcnow(),
-            value=float(value),
-            tags=tags
-        )
+        point = MetricPoint(timestamp=datetime.utcnow(), value=float(value), tags=tags)
         self.metrics[name].append(point)
 
     def _collection_loop(self):
@@ -294,7 +286,7 @@ class MetricsCollector:
             self.record_gauge("system.memory.available_mb", memory.available / 1024 / 1024)
 
             # Disk metrics
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
             self.record_gauge("system.disk.percent", disk.percent)
             self.record_gauge("system.disk.used_gb", disk.used / 1024 / 1024 / 1024)
             self.record_gauge("system.disk.free_gb", disk.free / 1024 / 1024 / 1024)
@@ -334,10 +326,10 @@ class TimerContext:
 
             # Add success/failure tag
             if exc_type is None:
-                self.tags['status'] = 'success'
+                self.tags["status"] = "success"
             else:
-                self.tags['status'] = 'error'
-                self.tags['error_type'] = exc_type.__name__
+                self.tags["status"] = "error"
+                self.tags["error_type"] = exc_type.__name__
 
             self.collector.record_timer(self.name, duration, self.tags)
 
@@ -350,27 +342,22 @@ class JobMetricsCollector:
 
     def record_job_submitted(self, job_id: str, job_type: str = "unknown"):
         """Record job submission."""
-        self.collector.record_counter("jobs.submitted", 1, {
-            'job_id': job_id,
-            'job_type': job_type
-        })
+        self.collector.record_counter("jobs.submitted", 1, {"job_id": job_id, "job_type": job_type})
 
     def record_job_started(self, job_id: str, executor_type: str = "unknown"):
         """Record job start."""
-        self.collector.record_counter("jobs.started", 1, {
-            'job_id': job_id,
-            'executor_type': executor_type
-        })
+        self.collector.record_counter(
+            "jobs.started", 1, {"job_id": job_id, "executor_type": executor_type}
+        )
 
     def record_job_completed(self, job_id: str, duration_seconds: float, success: bool = True):
         """Record job completion."""
         status = "success" if success else "failure"
 
-        self.collector.record_counter(f"jobs.{status}", 1, {'job_id': job_id})
-        self.collector.record_timer("jobs.duration", duration_seconds, {
-            'job_id': job_id,
-            'status': status
-        })
+        self.collector.record_counter(f"jobs.{status}", 1, {"job_id": job_id})
+        self.collector.record_timer(
+            "jobs.duration", duration_seconds, {"job_id": job_id, "status": status}
+        )
 
     def record_batch_processed(self, batch_size: int, duration_seconds: float):
         """Record batch processing metrics."""

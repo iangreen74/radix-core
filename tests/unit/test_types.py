@@ -1,11 +1,16 @@
 """Tests for core type definitions."""
 
-import pytest
-from radix_core.types import (
-    Job, JobStatus, JobResult, ResourceRequirements,
-    ExecutionResult,
-)
 from datetime import datetime
+
+import pytest
+
+from radix_core.types import (
+    ExecutionResult,
+    Job,
+    JobResult,
+    JobStatus,
+    ResourceRequirements,
+)
 
 
 class TestResourceRequirements:
@@ -114,8 +119,12 @@ class TestJobResult:
 class TestExecutionResult:
     def test_add_job_result(self):
         er = ExecutionResult(
-            plan_id="p1", total_jobs=2, completed_jobs=0, failed_jobs=0,
-            cancelled_jobs=0, start_time=datetime.utcnow(),
+            plan_id="p1",
+            total_jobs=2,
+            completed_jobs=0,
+            failed_jobs=0,
+            cancelled_jobs=0,
+            start_time=datetime.utcnow(),
         )
         er.add_job_result(JobResult(job_id="j1", status=JobStatus.COMPLETED, cpu_time_seconds=1.5))
         assert er.completed_jobs == 1
@@ -126,7 +135,11 @@ class TestExecutionResult:
 
     def test_success_rate(self):
         er = ExecutionResult(
-            plan_id="p1", total_jobs=4, completed_jobs=3, failed_jobs=1,
-            cancelled_jobs=0, start_time=datetime.utcnow(),
+            plan_id="p1",
+            total_jobs=4,
+            completed_jobs=3,
+            failed_jobs=1,
+            cancelled_jobs=0,
+            start_time=datetime.utcnow(),
         )
         assert er.success_rate == 0.75

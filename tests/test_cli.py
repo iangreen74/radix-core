@@ -1,6 +1,7 @@
 """Tests for the CLI interface."""
 
 from typer.testing import CliRunner
+
 from radix_core.cli.radix import cli
 
 runner = CliRunner()
@@ -25,19 +26,28 @@ class TestCLISubmit:
         assert "Job ID" in result.output
 
     def test_submit_with_options(self):
-        result = runner.invoke(cli, [
-            "submit", "echo test",
-            "--name", "my-job",
-            "--cpus", "2.0",
-            "--memory", "1024",
-            "--priority", "5",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "submit",
+                "echo test",
+                "--name",
+                "my-job",
+                "--cpus",
+                "2.0",
+                "--memory",
+                "1024",
+                "--priority",
+                "5",
+            ],
+        )
         assert result.exit_code == 0
         assert "my-job" in result.output
 
-    def test_submit_no_dry_run_fails(self):
-        result = runner.invoke(cli, ["submit", "echo", "--no-dry-run"])
-        assert result.exit_code == 1
+    def test_submit_shows_dry_run_status(self):
+        result = runner.invoke(cli, ["submit", "echo hello"])
+        assert result.exit_code == 0
+        assert "Dry-run" in result.output
 
 
 class TestCLIPlan:

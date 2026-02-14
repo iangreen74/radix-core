@@ -7,10 +7,10 @@ how the system handles various failure scenarios.
 
 import random
 import time
-from typing import Dict, Any, Optional, List, Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from contextlib import contextmanager
+from typing import Any, Callable, Dict, List, Optional
 
 from ..logging import get_logger
 
@@ -69,10 +69,12 @@ class RandomFailureInjector:
     def configure_failure(self, operation: str, config: FailureConfig):
         """Configure failure injection for a specific operation."""
         self.failure_configs[operation] = config
-        logger.debug("Failure injection configured",
-                    operation=operation,
-                    failure_type=config.failure_type.value,
-                    probability=config.probability)
+        logger.debug(
+            "Failure injection configured",
+            operation=operation,
+            failure_type=config.failure_type.value,
+            probability=config.probability,
+        )
 
     def should_inject_failure(self, operation: str) -> bool:
         """Determine if failure should be injected for this operation."""
@@ -95,10 +97,12 @@ class RandomFailureInjector:
         # Add random delay if configured
         if config.delay_range:
             delay = self.rng.uniform(*config.delay_range)
-            logger.warning("Injecting failure delay",
-                          operation=operation,
-                          failure_type=config.failure_type.value,
-                          delay_seconds=delay)
+            logger.warning(
+                "Injecting failure delay",
+                operation=operation,
+                failure_type=config.failure_type.value,
+                delay_seconds=delay,
+            )
             time.sleep(delay)
 
         # Record injection in history
@@ -106,7 +110,7 @@ class RandomFailureInjector:
             "timestamp": time.time(),
             "operation": operation,
             "failure_type": config.failure_type.value,
-            "metadata": config.metadata
+            "metadata": config.metadata,
         }
         self.injection_history.append(injection_record)
 
@@ -124,10 +128,12 @@ class RandomFailureInjector:
 
         message = error_messages.get(config.failure_type, f"Unknown failure in {operation}")
 
-        logger.error("Failure injected",
-                    operation=operation,
-                    failure_type=config.failure_type.value,
-                    message=message)
+        logger.error(
+            "Failure injected",
+            operation=operation,
+            failure_type=config.failure_type.value,
+            message=message,
+        )
 
         raise FailureInjectionError(config.failure_type, message, config.metadata)
 
@@ -183,15 +189,19 @@ def get_failure_injector() -> RandomFailureInjector:
     return _global_injector
 
 
-def configure_failure_injection(operation: str, failure_type: FailureType,
-                              probability: float, delay_range: tuple = (0.1, 2.0),
-                              metadata: Dict[str, Any] = None):
+def configure_failure_injection(
+    operation: str,
+    failure_type: FailureType,
+    probability: float,
+    delay_range: tuple = (0.1, 2.0),
+    metadata: Dict[str, Any] = None,
+):
     """Configure failure injection for an operation."""
     config = FailureConfig(
         failure_type=failure_type,
         probability=probability,
         delay_range=delay_range,
-        metadata=metadata
+        metadata=metadata,
     )
     get_failure_injector().configure_failure(operation, config)
 
@@ -212,14 +222,15 @@ def failure_injection_context(operation: str):
         raise
     except Exception as e:
         # Log unexpected errors but don't suppress them
-        logger.error("Unexpected error in failure injection context",
-                    operation=operation,
-                    error=str(e))
+        logger.error(
+            "Unexpected error in failure injection context", operation=operation, error=str(e)
+        )
         raise
 
 
 def failure_prone_operation(operation: str, metadata: Dict[str, Any] = None):
     """Decorator that adds failure injection to a function."""
+
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
             with failure_injection_context(operation):
@@ -245,7 +256,7 @@ class FailureScenarios:
                 operation=operation,
                 failure_type=FailureType.NETWORK_TIMEOUT,
                 probability=probability,
-                delay_range=(0.5, 3.0)
+                delay_range=(0.5, 3.0),
             )
 
     @staticmethod
@@ -256,7 +267,7 @@ class FailureScenarios:
                 operation=operation,
                 failure_type=FailureType.RESOURCE_EXHAUSTION,
                 probability=probability,
-                delay_range=(1.0, 5.0)
+                delay_range=(1.0, 5.0),
             )
 
     @staticmethod
@@ -265,7 +276,7 @@ class FailureScenarios:
         failure_types = [
             FailureType.SLOW_RESPONSE,
             FailureType.PARTIAL_FAILURE,
-            FailureType.NETWORK_DISCONNECT
+            FailureType.NETWORK_DISCONNECT,
         ]
 
         injector = get_failure_injector()
@@ -276,7 +287,7 @@ class FailureScenarios:
                 operation=operation,
                 failure_type=failure_type,
                 probability=probability,
-                delay_range=(0.1, 1.0)
+                delay_range=(0.1, 1.0),
             )
 
     @staticmethod
@@ -295,7 +306,7 @@ class FailureScenarios:
                 failure_type=failure_type,
                 probability=probability,
                 delay_range=(0.1, 2.0),
-                metadata={"chaos_monkey": True}
+                metadata={"chaos_monkey": True},
             )
 
 

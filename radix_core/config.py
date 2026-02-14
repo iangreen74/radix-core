@@ -5,10 +5,11 @@ principles using Pydantic settings. All safety-critical settings are immutable a
 """
 
 import os
-from typing import Dict, Any, Optional, List
-from pathlib import Path
 from dataclasses import dataclass, field
-from pydantic import Field, field_validator, ConfigDict
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -17,24 +18,30 @@ class SafetyConfig(BaseSettings):
 
     # Core safety settings - NEVER modify these defaults
     dry_run: bool = Field(default=True, description="Enable dry-run mode (REQUIRED)")
-    no_deploy_mode: bool = Field(default=True, description="Disable deployment operations (REQUIRED)")
+    no_deploy_mode: bool = Field(
+        default=True, description="Disable deployment operations (REQUIRED)"
+    )
     cost_cap_usd: float = Field(default=0.00, description="Maximum cost in USD (REQUIRED: 0.00)")
-    max_job_cost_usd: float = Field(default=0.00, description="Maximum per-job cost in USD (REQUIRED: 0.00)")
+    max_job_cost_usd: float = Field(
+        default=0.00, description="Maximum per-job cost in USD (REQUIRED: 0.00)"
+    )
 
-    @field_validator('dry_run')
+    @field_validator("dry_run")
     @classmethod
     def validate_dry_run(cls, v):
         from .mode import is_production
+
         if is_production():
             return v  # Allow any value in production
         if not v:
             raise ValueError("DRY_RUN must be True for safety")
         return v
 
-    @field_validator('cost_cap_usd')
+    @field_validator("cost_cap_usd")
     @classmethod
     def validate_cost_cap(cls, v):
         from .mode import is_production
+
         if is_production():
             if v <= 0:
                 raise ValueError("COST_CAP_USD must be > 0 in production mode")
@@ -43,10 +50,11 @@ class SafetyConfig(BaseSettings):
             raise ValueError("COST_CAP_USD must be 0.00 for safety")
         return v
 
-    @field_validator('max_job_cost_usd')
+    @field_validator("max_job_cost_usd")
     @classmethod
     def validate_max_job_cost(cls, v):
         from .mode import is_production
+
         if is_production():
             if v <= 0:
                 raise ValueError("MAX_JOB_COST_USD must be > 0 in production mode")
@@ -55,21 +63,18 @@ class SafetyConfig(BaseSettings):
             raise ValueError("MAX_JOB_COST_USD must be 0.00 for safety")
         return v
 
-    @field_validator('no_deploy_mode')
+    @field_validator("no_deploy_mode")
     @classmethod
     def validate_no_deploy(cls, v):
         from .mode import is_production
+
         if is_production():
             return v  # Allow any value in production
         if not v:
             raise ValueError("NO_DEPLOY_MODE must be True for safety")
         return v
 
-    model_config = ConfigDict(
-        env_prefix="",
-        case_sensitive=False,
-        frozen=True  # Immutable
-    )
+    model_config = {"frozen": True}  # Immutable
 
 
 @dataclass
@@ -98,6 +103,7 @@ class ExecutionConfig:
         # Safety: Ray must be in local mode (unless production)
         if not self.ray_local_mode:
             from .mode import is_production
+
             if not is_production():
                 raise ValueError("Ray must be in local mode for safety")
 
@@ -227,7 +233,7 @@ class RadixConfig:
     debug: bool = False
 
     @classmethod
-    def from_env(cls, env_file: Optional[str] = None) -> 'RadixConfig':
+    def from_env(cls, env_file: Optional[str] = None) -> "RadixConfig":
         """Load configuration from environment variables."""
 
         # Load from .env file if specified
@@ -236,62 +242,63 @@ class RadixConfig:
 
         # Mode-aware defaults
         from .mode import is_production
+
         prod = is_production()
 
         # Create safety config from environment
         safety = SafetyConfig(
-            dry_run=cls._get_bool_env('DRY_RUN', False if prod else True),
-            no_deploy_mode=cls._get_bool_env('NO_DEPLOY_MODE', False if prod else True),
-            cost_cap_usd=cls._get_float_env('COST_CAP_USD', 100.0 if prod else 0.0),
-            max_job_cost_usd=cls._get_float_env('MAX_JOB_COST_USD', 10.0 if prod else 0.0)
+            dry_run=cls._get_bool_env("DRY_RUN", False if prod else True),
+            no_deploy_mode=cls._get_bool_env("NO_DEPLOY_MODE", False if prod else True),
+            cost_cap_usd=cls._get_float_env("COST_CAP_USD", 100.0 if prod else 0.0),
+            max_job_cost_usd=cls._get_float_env("MAX_JOB_COST_USD", 10.0 if prod else 0.0),
         )
 
         # Create execution config from environment
         execution = ExecutionConfig(
-            max_parallelism=cls._get_int_env('MAX_PARALLELISM', 4),
-            default_executor=os.getenv('DEFAULT_EXECUTOR', 'local_subprocess'),
-            enable_gpu=cls._get_bool_env('ENABLE_GPU', False),
-            ray_local_mode=cls._get_bool_env('RAY_LOCAL_MODE', True),
-            ray_num_cpus=cls._get_int_env('RAY_NUM_CPUS', 4),
-            ray_num_gpus=cls._get_int_env('RAY_NUM_GPUS', 0)
+            max_parallelism=cls._get_int_env("MAX_PARALLELISM", 4),
+            default_executor=os.getenv("DEFAULT_EXECUTOR", "local_subprocess"),
+            enable_gpu=cls._get_bool_env("ENABLE_GPU", False),
+            ray_local_mode=cls._get_bool_env("RAY_LOCAL_MODE", True),
+            ray_num_cpus=cls._get_int_env("RAY_NUM_CPUS", 4),
+            ray_num_gpus=cls._get_int_env("RAY_NUM_GPUS", 0),
         )
 
         # Create logging config from environment
         logging = LoggingConfig(
-            log_level=os.getenv('LOG_LEVEL', 'INFO'),
-            log_format=os.getenv('LOG_FORMAT', 'console'),
-            enable_metrics=cls._get_bool_env('ENABLE_METRICS', True),
-            metrics_interval=cls._get_int_env('METRICS_INTERVAL', 60),
-            enable_profiling=cls._get_bool_env('ENABLE_PROFILING', False)
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
+            log_format=os.getenv("LOG_FORMAT", "console"),
+            enable_metrics=cls._get_bool_env("ENABLE_METRICS", True),
+            metrics_interval=cls._get_int_env("METRICS_INTERVAL", 60),
+            enable_profiling=cls._get_bool_env("ENABLE_PROFILING", False),
         )
 
         # Create swarm config from environment
         swarm = SwarmConfig(
-            node_count=cls._get_int_env('SWARM_NODE_COUNT', 3),
-            heartbeat_interval=cls._get_int_env('HEARTBEAT_INTERVAL', 5),
-            failure_probability=cls._get_float_env('FAILURE_PROBABILITY', 0.1),
-            recovery_time=cls._get_int_env('RECOVERY_TIME', 30)
+            node_count=cls._get_int_env("SWARM_NODE_COUNT", 3),
+            heartbeat_interval=cls._get_int_env("HEARTBEAT_INTERVAL", 5),
+            failure_probability=cls._get_float_env("FAILURE_PROBABILITY", 0.1),
+            recovery_time=cls._get_int_env("RECOVERY_TIME", 30),
         )
 
         # Create batching config from environment
         batching = BatchingConfig(
-            default_batch_size=cls._get_int_env('DEFAULT_BATCH_SIZE', 32),
-            max_batch_wait=cls._get_float_env('MAX_BATCH_WAIT', 5.0),
-            enable_dynamic_batching=cls._get_bool_env('ENABLE_DYNAMIC_BATCHING', True),
-            microbatch_size=cls._get_int_env('MICROBATCH_SIZE', 8)
+            default_batch_size=cls._get_int_env("DEFAULT_BATCH_SIZE", 32),
+            max_batch_wait=cls._get_float_env("MAX_BATCH_WAIT", 5.0),
+            enable_dynamic_batching=cls._get_bool_env("ENABLE_DYNAMIC_BATCHING", True),
+            microbatch_size=cls._get_int_env("MICROBATCH_SIZE", 8),
         )
 
         # Create research config from environment
         research = ResearchConfig(
-            experiment_name=os.getenv('EXPERIMENT_NAME', 'default'),
-            experiment_version=os.getenv('EXPERIMENT_VERSION', 'v1'),
-            random_seed=cls._get_int_env('RANDOM_SEED', 42),
-            log_experiments=cls._get_bool_env('LOG_EXPERIMENTS', True),
-            results_dir=os.getenv('RESULTS_DIR', './results')
+            experiment_name=os.getenv("EXPERIMENT_NAME", "default"),
+            experiment_version=os.getenv("EXPERIMENT_VERSION", "v1"),
+            random_seed=cls._get_int_env("RANDOM_SEED", 42),
+            log_experiments=cls._get_bool_env("LOG_EXPERIMENTS", True),
+            results_dir=os.getenv("RESULTS_DIR", "./results"),
         )
 
         # Additional settings
-        debug = cls._get_bool_env('DEBUG', False)
+        debug = cls._get_bool_env("DEBUG", False)
 
         return cls(
             safety=safety,
@@ -300,7 +307,7 @@ class RadixConfig:
             swarm=swarm,
             batching=batching,
             research=research,
-            debug=debug
+            debug=debug,
         )
 
     @staticmethod
@@ -310,18 +317,18 @@ class RadixConfig:
         if not env_path.exists():
             return
 
-        with open(env_path, 'r') as f:
+        with open(env_path, "r") as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
                     os.environ[key.strip()] = value.strip()
 
     @staticmethod
     def _get_bool_env(key: str, default: bool) -> bool:
         """Get boolean environment variable."""
         value = os.getenv(key, str(default)).lower()
-        return value in ('true', '1', 'yes', 'on')
+        return value in ("true", "1", "yes", "on")
 
     @staticmethod
     def _get_int_env(key: str, default: int) -> int:
@@ -350,7 +357,7 @@ class RadixConfig:
                 dry_run=self.safety.dry_run,
                 no_deploy_mode=self.safety.no_deploy_mode,
                 cost_cap_usd=self.safety.cost_cap_usd,
-                max_job_cost_usd=self.safety.max_job_cost_usd
+                max_job_cost_usd=self.safety.max_job_cost_usd,
             )
         except ValueError as e:
             errors.append(f"Safety configuration error: {e}")
@@ -371,52 +378,54 @@ class RadixConfig:
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""
         return {
-            'safety': {
-                'dry_run': self.safety.dry_run,
-                'no_deploy_mode': self.safety.no_deploy_mode,
-                'cost_cap_usd': self.safety.cost_cap_usd,
-                'max_job_cost_usd': self.safety.max_job_cost_usd
+            "safety": {
+                "dry_run": self.safety.dry_run,
+                "no_deploy_mode": self.safety.no_deploy_mode,
+                "cost_cap_usd": self.safety.cost_cap_usd,
+                "max_job_cost_usd": self.safety.max_job_cost_usd,
             },
-            'execution': {
-                'max_parallelism': self.execution.max_parallelism,
-                'default_executor': self.execution.default_executor,
-                'enable_gpu': self.execution.enable_gpu,
-                'ray_local_mode': self.execution.ray_local_mode,
-                'ray_num_cpus': self.execution.ray_num_cpus,
-                'ray_num_gpus': self.execution.ray_num_gpus
+            "execution": {
+                "max_parallelism": self.execution.max_parallelism,
+                "default_executor": self.execution.default_executor,
+                "enable_gpu": self.execution.enable_gpu,
+                "ray_local_mode": self.execution.ray_local_mode,
+                "ray_num_cpus": self.execution.ray_num_cpus,
+                "ray_num_gpus": self.execution.ray_num_gpus,
             },
-            'logging': {
-                'log_level': self.logging.log_level,
-                'log_format': self.logging.log_format,
-                'enable_metrics': self.logging.enable_metrics,
-                'metrics_interval': self.logging.metrics_interval,
-                'enable_profiling': self.logging.enable_profiling
+            "logging": {
+                "log_level": self.logging.log_level,
+                "log_format": self.logging.log_format,
+                "enable_metrics": self.logging.enable_metrics,
+                "metrics_interval": self.logging.metrics_interval,
+                "enable_profiling": self.logging.enable_profiling,
             },
-            'swarm': {
-                'node_count': self.swarm.node_count,
-                'heartbeat_interval': self.swarm.heartbeat_interval,
-                'failure_probability': self.swarm.failure_probability,
-                'recovery_time': self.swarm.recovery_time
+            "swarm": {
+                "node_count": self.swarm.node_count,
+                "heartbeat_interval": self.swarm.heartbeat_interval,
+                "failure_probability": self.swarm.failure_probability,
+                "recovery_time": self.swarm.recovery_time,
             },
-            'batching': {
-                'default_batch_size': self.batching.default_batch_size,
-                'max_batch_wait': self.batching.max_batch_wait,
-                'enable_dynamic_batching': self.batching.enable_dynamic_batching,
-                'microbatch_size': self.batching.microbatch_size
+            "batching": {
+                "default_batch_size": self.batching.default_batch_size,
+                "max_batch_wait": self.batching.max_batch_wait,
+                "enable_dynamic_batching": self.batching.enable_dynamic_batching,
+                "microbatch_size": self.batching.microbatch_size,
             },
-            'research': {
-                'experiment_name': self.research.experiment_name,
-                'experiment_version': self.research.experiment_version,
-                'random_seed': self.research.random_seed,
-                'log_experiments': self.research.log_experiments,
-                'results_dir': self.research.results_dir
+            "research": {
+                "experiment_name": self.research.experiment_name,
+                "experiment_version": self.research.experiment_version,
+                "random_seed": self.research.random_seed,
+                "log_experiments": self.research.log_experiments,
+                "results_dir": self.research.results_dir,
             },
-            'debug': self.debug
+            "debug": self.debug,
         }
 
     def __str__(self) -> str:
         """String representation of configuration."""
-        return f"RadixConfig(dry_run={self.safety.dry_run}, cost_cap=${self.safety.cost_cap_usd:.2f})"
+        return (
+            f"RadixConfig(dry_run={self.safety.dry_run}, cost_cap=${self.safety.cost_cap_usd:.2f})"
+        )
 
 
 # Global configuration instance

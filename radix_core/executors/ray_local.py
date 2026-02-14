@@ -5,29 +5,30 @@ This module provides Ray-based execution in local mode only for ridiculously
 parallel tasks with comprehensive safety guards.
 """
 
+import threading
 import time
-from typing import Dict, List, Any, Optional, Callable, TypeVar
 from dataclasses import dataclass
 from datetime import datetime
-import threading
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 try:
     import ray
+
     RAY_AVAILABLE = True
 except ImportError:
     RAY_AVAILABLE = False
     ray = None
 
 from ..config import get_config
-from ..logging import get_logger
-from ..utils.timers import time_operation
-from ..utils.randfail import seeded_failure
 from ..dryrun import DryRunGuard
+from ..logging import get_logger
+from ..utils.randfail import seeded_failure
+from ..utils.timers import time_operation
 
 logger = get_logger(__name__)
 
-T = TypeVar('T')
-R = TypeVar('R')
+T = TypeVar("T")
+R = TypeVar("R")
 
 
 @dataclass
@@ -54,10 +55,12 @@ class RayLocalExecutor:
     - Cost tracking (always $0.00 in dry-run)
     """
 
-    def __init__(self,
-                 num_cpus: Optional[int] = None,
-                 num_gpus: int = 0,
-                 object_store_memory: Optional[int] = None):
+    def __init__(
+        self,
+        num_cpus: Optional[int] = None,
+        num_gpus: int = 0,
+        object_store_memory: Optional[int] = None,
+    ):
         """
         Initialize Ray local executor.
 
@@ -79,10 +82,15 @@ class RayLocalExecutor:
         # Safety checks
         if not self.config.execution.ray_local_mode:
             from ..mode import is_production
+
             if not is_production():
                 raise ValueError("Ray must be in local mode for safety")
 
-        if self.num_gpus > 0 and not getattr(self.config.execution, 'enable_cuda', getattr(self.config.execution, 'enable_gpu', False)):
+        if self.num_gpus > 0 and not getattr(
+            self.config.execution,
+            "enable_cuda",
+            getattr(self.config.execution, "enable_gpu", False),
+        ):
             logger.warning("GPU allocation requested but CUDA disabled")
             self.num_gpus = 0
 
@@ -123,10 +131,12 @@ class RayLocalExecutor:
             if self.object_store_memory:
                 ray_config["object_store_memory"] = self.object_store_memory
 
-            logger.info("Initializing Ray in local mode",
-                       num_cpus=self.num_cpus,
-                       num_gpus=self.num_gpus,
-                       local_mode=True)
+            logger.info(
+                "Initializing Ray in local mode",
+                num_cpus=self.num_cpus,
+                num_gpus=self.num_gpus,
+                local_mode=True,
+            )
 
             # Initialize Ray
             ray.init(**ray_config)
@@ -145,14 +155,16 @@ class RayLocalExecutor:
                 "resources": cluster_resources,
                 "nodes": len(nodes),
                 "local_mode": True,
-                "initialized_at": datetime.utcnow().isoformat()
+                "initialized_at": datetime.utcnow().isoformat(),
             }
 
             self.is_initialized = True
 
-            logger.info("Ray initialized successfully",
-                       cluster_resources=cluster_resources,
-                       node_count=len(nodes))
+            logger.info(
+                "Ray initialized successfully",
+                cluster_resources=cluster_resources,
+                node_count=len(nodes),
+            )
 
         except Exception as e:
             logger.error("Failed to initialize Ray", error=str(e))
@@ -164,8 +176,7 @@ class RayLocalExecutor:
             return
 
         try:
-            logger.info("Shutting down Ray cluster",
-                       active_tasks=len(self.active_tasks))
+            logger.info("Shutting down Ray cluster", active_tasks=len(self.active_tasks))
 
             # Cancel active tasks
             with self.lock:
@@ -185,10 +196,9 @@ class RayLocalExecutor:
             logger.error("Error during Ray shutdown", error=str(e))
 
     @DryRunGuard.protect
-    def map_parallel(self,
-                    data: List[T],
-                    map_func: Callable[[T], R],
-                    chunk_size: Optional[int] = None) -> List[R]:
+    def map_parallel(
+        self, data: List[T], map_func: Callable[[T], R], chunk_size: Optional[int] = None
+    ) -> List[R]:
         """
         Execute map operation in parallel using Ray.
 
@@ -214,10 +224,12 @@ class RayLocalExecutor:
             chunk_size = max(1, len(data) // (self.num_cpus * 2))
 
         with time_operation(f"ray_map_parallel_{len(data)}"):
-            logger.info("Starting parallel map operation",
-                       data_size=len(data),
-                       chunk_size=chunk_size,
-                       num_chunks=len(data) // chunk_size + (1 if len(data) % chunk_size else 0))
+            logger.info(
+                "Starting parallel map operation",
+                data_size=len(data),
+                chunk_size=chunk_size,
+                num_chunks=len(data) // chunk_size + (1 if len(data) % chunk_size else 0),
+            )
 
             # Create Ray remote function
             @ray.remote
@@ -230,7 +242,7 @@ class RayLocalExecutor:
                     raise
 
             # Split data into chunks
-            chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
+            chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
 
             # Submit tasks
             task_refs = []
@@ -262,16 +274,24 @@ class RayLocalExecutor:
                             del self.active_tasks[task_id]
 
                         self.total_tasks_completed += 1
-                        self.completed_tasks.append(RayTaskResult(
-                            task_id=task_id,
-                            success=True,
-                            result=len(chunk_results[task_ids.index(task_id)]) if task_id in task_ids else 0
-                        ))
+                        self.completed_tasks.append(
+                            RayTaskResult(
+                                task_id=task_id,
+                                success=True,
+                                result=(
+                                    len(chunk_results[task_ids.index(task_id)])
+                                    if task_id in task_ids
+                                    else 0
+                                ),
+                            )
+                        )
 
-                logger.info("Parallel map operation completed",
-                           data_size=len(data),
-                           results_size=len(results),
-                           tasks_completed=len(task_ids))
+                logger.info(
+                    "Parallel map operation completed",
+                    data_size=len(data),
+                    results_size=len(results),
+                    tasks_completed=len(task_ids),
+                )
 
                 return results
 
@@ -283,20 +303,17 @@ class RayLocalExecutor:
                             del self.active_tasks[task_id]
 
                         self.total_tasks_failed += 1
-                        self.completed_tasks.append(RayTaskResult(
-                            task_id=task_id,
-                            success=False,
-                            error=str(e)
-                        ))
+                        self.completed_tasks.append(
+                            RayTaskResult(task_id=task_id, success=False, error=str(e))
+                        )
 
                 logger.error("Parallel map operation failed", error=str(e))
                 raise
 
     @DryRunGuard.protect
-    def reduce_parallel(self,
-                       data: List[T],
-                       reduce_func: Callable[[List[T]], R],
-                       chunk_size: Optional[int] = None) -> R:
+    def reduce_parallel(
+        self, data: List[T], reduce_func: Callable[[List[T]], R], chunk_size: Optional[int] = None
+    ) -> R:
         """
         Execute reduce operation in parallel using Ray.
 
@@ -325,9 +342,9 @@ class RayLocalExecutor:
             chunk_size = max(1, len(data) // self.num_cpus)
 
         with time_operation(f"ray_reduce_parallel_{len(data)}"):
-            logger.info("Starting parallel reduce operation",
-                       data_size=len(data),
-                       chunk_size=chunk_size)
+            logger.info(
+                "Starting parallel reduce operation", data_size=len(data), chunk_size=chunk_size
+            )
 
             # Create Ray remote function
             @ray.remote
@@ -347,8 +364,10 @@ class RayLocalExecutor:
                 iteration += 1
 
                 # Split into chunks
-                chunks = [current_data[i:i + chunk_size]
-                         for i in range(0, len(current_data), chunk_size)]
+                chunks = [
+                    current_data[i : i + chunk_size]
+                    for i in range(0, len(current_data), chunk_size)
+                ]
 
                 # Submit reduction tasks
                 task_refs = []
@@ -375,10 +394,9 @@ class RayLocalExecutor:
                                 del self.active_tasks[task_id]
 
                             self.total_tasks_completed += 1
-                            self.completed_tasks.append(RayTaskResult(
-                                task_id=task_id,
-                                success=True
-                            ))
+                            self.completed_tasks.append(
+                                RayTaskResult(task_id=task_id, success=True)
+                            )
 
                 except Exception as e:
                     # Handle failures
@@ -389,28 +407,32 @@ class RayLocalExecutor:
 
                             self.total_tasks_failed += 1
 
-                    logger.error("Parallel reduce operation failed",
-                               iteration=iteration, error=str(e))
+                    logger.error(
+                        "Parallel reduce operation failed", iteration=iteration, error=str(e)
+                    )
                     raise
 
-                logger.debug("Reduce iteration completed",
-                           iteration=iteration,
-                           input_size=len(chunks),
-                           output_size=len(current_data))
+                logger.debug(
+                    "Reduce iteration completed",
+                    iteration=iteration,
+                    input_size=len(chunks),
+                    output_size=len(current_data),
+                )
 
             result = current_data[0]
 
-            logger.info("Parallel reduce operation completed",
-                       iterations=iteration,
-                       final_result_type=type(result).__name__)
+            logger.info(
+                "Parallel reduce operation completed",
+                iterations=iteration,
+                final_result_type=type(result).__name__,
+            )
 
             return result
 
     def get_stats(self) -> Dict[str, Any]:
         """Get executor statistics."""
         with self.lock:
-            success_rate = (self.total_tasks_completed /
-                          max(self.total_tasks_submitted, 1))
+            success_rate = self.total_tasks_completed / max(self.total_tasks_submitted, 1)
 
             return {
                 "executor_type": "ray_local",
@@ -426,8 +448,8 @@ class RayLocalExecutor:
                 "config": {
                     "num_cpus": self.num_cpus,
                     "num_gpus": self.num_gpus,
-                    "local_mode_enforced": True
-                }
+                    "local_mode_enforced": True,
+                },
             }
 
     def get_cluster_info(self) -> Dict[str, Any]:
@@ -441,7 +463,9 @@ class RayLocalExecutor:
                 "available_resources": ray.available_resources(),
                 "nodes": len(ray.nodes()),
                 "local_mode": True,
-                "object_store_stats": ray.object_store_stats() if hasattr(ray, 'object_store_stats') else {}
+                "object_store_stats": (
+                    ray.object_store_stats() if hasattr(ray, "object_store_stats") else {}
+                ),
             }
         except Exception as e:
             logger.error("Error getting cluster info", error=str(e))
@@ -458,9 +482,9 @@ class RayLocalExecutor:
 
 
 # Convenience functions for common patterns
-def parallel_map(data: List[T],
-                map_func: Callable[[T], R],
-                num_cpus: Optional[int] = None) -> List[R]:
+def parallel_map(
+    data: List[T], map_func: Callable[[T], R], num_cpus: Optional[int] = None
+) -> List[R]:
     """
     Convenience function for parallel map operation.
 
@@ -476,9 +500,9 @@ def parallel_map(data: List[T],
         return executor.map_parallel(data, map_func)
 
 
-def parallel_reduce(data: List[T],
-                   reduce_func: Callable[[List[T]], R],
-                   num_cpus: Optional[int] = None) -> R:
+def parallel_reduce(
+    data: List[T], reduce_func: Callable[[List[T]], R], num_cpus: Optional[int] = None
+) -> R:
     """
     Convenience function for parallel reduce operation.
 

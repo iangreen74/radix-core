@@ -1,7 +1,8 @@
 """Shared test fixtures for radix-core."""
 
 import pytest
-from radix_core.config import reset_config, get_config
+
+from radix_core.config import get_config, reset_config
 from radix_core.types import Job, ResourceRequirements
 
 

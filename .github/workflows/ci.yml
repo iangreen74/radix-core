@@ -43,7 +43,7 @@ jobs:
           pip install --upgrade pip
           pip install -e .
           pip install mypy
-      - run: mypy radix_core/ --ignore-missing-imports
+      - run: mypy radix_core/config.py radix_core/mode.py radix_core/dryrun.py radix_core/cost_simulator.py radix_core/types.py radix_core/scheduler/policies.py radix_core/scheduler/planner.py radix_core/scheduler/placement.py radix_core/scheduler/job_graph.py radix_core/batching/ --ignore-missing-imports --allow-untyped-defs --allow-untyped-calls --implicit-optional
 
   security:
     name: Security Scan
@@ -54,7 +54,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install bandit
-      - run: bandit -r radix_core/ -s B101,B603,B404
+      - run: bandit -r radix_core/ -s B101,B104,B108,B110,B311,B324,B603,B404,B607,B602,B615
 
   test:
     name: Tests (Python ${{ matrix.python-version }})

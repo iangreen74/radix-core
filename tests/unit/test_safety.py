@@ -1,9 +1,10 @@
 """Tests for safety guards, dry-run, and cost simulation."""
 
 import pytest
-from radix_core.dryrun import DryRunGuard, CostGuard, DeploymentGuard, NetworkGuard
+
 from radix_core.cost_simulator import CostSimulator
-from radix_core.errors import SafetyViolationError, CostCapExceededError
+from radix_core.dryrun import CostGuard, DeploymentGuard, DryRunGuard, NetworkGuard
+from radix_core.errors import CostCapExceededError, SafetyViolationError
 
 
 class TestDryRunGuard:
@@ -79,7 +80,8 @@ class TestProductionModeSafety:
 
     def test_dryrun_guard_executes_real_function_in_production(self, monkeypatch):
         monkeypatch.setenv("RADIX_MODE", "production")
-        from radix_core.config import reset_config, RadixConfig, set_config
+        from radix_core.config import RadixConfig, reset_config, set_config
+
         reset_config()
         cfg = RadixConfig.from_env()
         set_config(cfg)
@@ -93,7 +95,8 @@ class TestProductionModeSafety:
 
     def test_verify_safety_production_requires_cost_caps(self, monkeypatch):
         monkeypatch.setenv("RADIX_MODE", "production")
-        from radix_core.config import reset_config, RadixConfig, set_config
+        from radix_core.config import RadixConfig, reset_config, set_config
+
         reset_config()
 
         # Default production config has positive cost caps, should pass
@@ -103,7 +106,8 @@ class TestProductionModeSafety:
 
     def test_cost_guard_allows_nonzero_in_production(self, monkeypatch):
         monkeypatch.setenv("RADIX_MODE", "production")
-        from radix_core.config import reset_config, RadixConfig, set_config
+        from radix_core.config import RadixConfig, reset_config, set_config
+
         reset_config()
         cfg = RadixConfig.from_env()
         set_config(cfg)
@@ -113,7 +117,8 @@ class TestProductionModeSafety:
 
     def test_cost_guard_enforces_cap_in_production(self, monkeypatch):
         monkeypatch.setenv("RADIX_MODE", "production")
-        from radix_core.config import reset_config, RadixConfig, set_config
+        from radix_core.config import RadixConfig, reset_config, set_config
+
         reset_config()
         cfg = RadixConfig.from_env()
         set_config(cfg)
@@ -128,7 +133,8 @@ class TestProductionModeSafety:
 
     def test_deployment_guard_allows_deploy_in_production(self, monkeypatch):
         monkeypatch.setenv("RADIX_MODE", "production")
-        from radix_core.config import reset_config, RadixConfig, set_config
+        from radix_core.config import RadixConfig, reset_config, set_config
+
         reset_config()
         cfg = RadixConfig.from_env()
         set_config(cfg)

@@ -2,8 +2,8 @@
 Utility modules for Radix core functionality.
 """
 
-from .timers import Timer, AsyncTimer, time_operation
 from .randfail import RandomFailureInjector, seeded_failure
+from .timers import AsyncTimer, Timer, time_operation
 
 __all__ = [
     "Timer",

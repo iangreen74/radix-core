@@ -3,10 +3,10 @@ High-precision timing utilities for performance measurement and SLA monitoring.
 """
 
 import time
-from contextlib import contextmanager, asynccontextmanager
-from typing import Dict, Any, Optional, Callable
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Callable, Dict, Optional
 
 from ..logging import get_logger
 
@@ -47,7 +47,7 @@ class Timer:
         self.end_datetime: Optional[datetime] = None
         self.success = True
 
-    def start(self) -> 'Timer':
+    def start(self) -> "Timer":
         """Start the timer."""
         self.start_time = time.perf_counter()
         self.start_datetime = datetime.utcnow()
@@ -64,20 +64,23 @@ class Timer:
 
         duration = self.end_time - self.start_time
 
+        assert self.start_datetime is not None
         result = TimingResult(
             operation=self.operation,
             start_time=self.start_datetime,
             end_time=self.end_datetime,
             duration_seconds=duration,
             success=self.success,
-            metadata=self.metadata
+            metadata=self.metadata,
         )
 
-        logger.debug("Timer stopped",
-                    operation=self.operation,
-                    duration_ms=result.duration_ms,
-                    success=self.success,
-                    **self.metadata)
+        logger.debug(
+            "Timer stopped",
+            operation=self.operation,
+            duration_ms=result.duration_ms,
+            success=self.success,
+            **self.metadata,
+        )
 
         return result
 
@@ -85,7 +88,7 @@ class Timer:
         """Mark the operation as failed."""
         self.success = False
 
-    def __enter__(self) -> 'Timer':
+    def __enter__(self) -> "Timer":
         """Context manager entry."""
         return self.start()
 
@@ -108,7 +111,7 @@ class AsyncTimer:
         self.end_datetime: Optional[datetime] = None
         self.success = True
 
-    async def start(self) -> 'AsyncTimer':
+    async def start(self) -> "AsyncTimer":
         """Start the async timer."""
         self.start_time = time.perf_counter()
         self.start_datetime = datetime.utcnow()
@@ -125,20 +128,23 @@ class AsyncTimer:
 
         duration = self.end_time - self.start_time
 
+        assert self.start_datetime is not None
         result = TimingResult(
             operation=self.operation,
             start_time=self.start_datetime,
             end_time=self.end_datetime,
             duration_seconds=duration,
             success=self.success,
-            metadata=self.metadata
+            metadata=self.metadata,
         )
 
-        logger.debug("Async timer stopped",
-                    operation=self.operation,
-                    duration_ms=result.duration_ms,
-                    success=self.success,
-                    **self.metadata)
+        logger.debug(
+            "Async timer stopped",
+            operation=self.operation,
+            duration_ms=result.duration_ms,
+            success=self.success,
+            **self.metadata,
+        )
 
         return result
 
@@ -146,7 +152,7 @@ class AsyncTimer:
         """Mark the operation as failed."""
         self.success = False
 
-    async def __aenter__(self) -> 'AsyncTimer':
+    async def __aenter__(self) -> "AsyncTimer":
         """Async context manager entry."""
         return await self.start()
 
@@ -170,11 +176,13 @@ def time_operation(operation: str, metadata: Optional[Dict[str, Any]] = None):
     finally:
         result = timer.stop()
         # Log timing result for monitoring
-        logger.info("Operation timed",
-                   operation=operation,
-                   duration_ms=result.duration_ms,
-                   success=result.success,
-                   **metadata or {})
+        logger.info(
+            "Operation timed",
+            operation=operation,
+            duration_ms=result.duration_ms,
+            success=result.success,
+            **metadata or {},
+        )
 
 
 @asynccontextmanager
@@ -190,11 +198,13 @@ async def async_time_operation(operation: str, metadata: Optional[Dict[str, Any]
     finally:
         result = await timer.stop()
         # Log timing result for monitoring
-        logger.info("Async operation timed",
-                   operation=operation,
-                   duration_ms=result.duration_ms,
-                   success=result.success,
-                   **metadata or {})
+        logger.info(
+            "Async operation timed",
+            operation=operation,
+            duration_ms=result.duration_ms,
+            success=result.success,
+            **metadata or {},
+        )
 
 
 class SLAMonitor:
@@ -238,11 +248,13 @@ class SLAMonitor:
                 self.violations[result.operation] = 0
             self.violations[result.operation] += 1
 
-            logger.warning("SLA violation",
-                          operation=result.operation,
-                          duration_ms=result.duration_ms,
-                          target_ms=target * 1000,
-                          violation_count=self.violations[result.operation])
+            logger.warning(
+                "SLA violation",
+                operation=result.operation,
+                duration_ms=result.duration_ms,
+                target_ms=target * 1000,
+                violation_count=self.violations[result.operation],
+            )
 
         return meets_sla
 
@@ -252,7 +264,7 @@ class SLAMonitor:
             return {"error": "No measurements found"}
 
         measurements = self.measurements[operation]
-        target = self.sla_targets.get(operation, float('inf'))
+        target = self.sla_targets.get(operation, float("inf"))
         violations = self.violations.get(operation, 0)
 
         # Calculate percentiles
@@ -304,6 +316,7 @@ def check_operation_sla(result: TimingResult) -> bool:
 # Decorator for automatic timing and SLA checking
 def timed_operation(operation: str, metadata: Optional[Dict[str, Any]] = None):
     """Decorator for automatic operation timing."""
+
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
             with time_operation(operation, metadata) as timer:
@@ -324,6 +337,7 @@ def timed_operation(operation: str, metadata: Optional[Dict[str, Any]] = None):
 
 def async_timed_operation(operation: str, metadata: Optional[Dict[str, Any]] = None):
     """Decorator for automatic async operation timing."""
+
     def decorator(func: Callable) -> Callable:
         async def wrapper(*args, **kwargs):
             async with async_time_operation(operation, metadata) as timer:

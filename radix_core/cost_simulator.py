@@ -6,12 +6,12 @@ purposes. In dry-run mode, all costs are $0.00 to prevent accidental spending.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from .config import get_config
-from .types import Job
 from .errors import CostCapExceededError, SafetyViolationError
+from .types import Job
 
 
 @dataclass
@@ -43,13 +43,15 @@ class CostEstimate:
         if config.safety.dry_run and self.estimated_cost_usd != 0.0:
             raise SafetyViolationError(
                 f"Cost estimate must be $0.00 in dry-run mode, got ${self.estimated_cost_usd:.2f}",
-                "Ensure dry-run mode is properly configured"
+                "Ensure dry-run mode is properly configured",
             )
 
         # Validate breakdown sums to total
         breakdown_total = sum(self.breakdown.values())
         if abs(breakdown_total - self.estimated_cost_usd) > 0.01:
-            raise ValueError(f"Cost breakdown ({breakdown_total:.2f}) doesn't match total ({self.estimated_cost_usd:.2f})")
+            raise ValueError(
+                f"Cost breakdown ({breakdown_total:.2f}) doesn't match total ({self.estimated_cost_usd:.2f})"
+            )
 
 
 class CostSimulator:
@@ -62,11 +64,11 @@ class CostSimulator:
 
     # Simulated pricing (used for research modeling only)
     SIMULATED_PRICING = {
-        'cpu_core_hour': 0.05,      # $0.05 per CPU core hour
-        'memory_gb_hour': 0.01,     # $0.01 per GB memory hour
-        'gpu_hour': 0.50,           # $0.50 per GPU hour
-        'storage_gb_hour': 0.0001,  # $0.0001 per GB storage hour
-        'network_gb': 0.10,         # $0.10 per GB network transfer
+        "cpu_core_hour": 0.05,  # $0.05 per CPU core hour
+        "memory_gb_hour": 0.01,  # $0.01 per GB memory hour
+        "gpu_hour": 0.50,  # $0.50 per GPU hour
+        "storage_gb_hour": 0.0001,  # $0.0001 per GB storage hour
+        "network_gb": 0.10,  # $0.10 per GB network transfer
     }
 
     def __init__(self):
@@ -123,7 +125,7 @@ class CostSimulator:
             storage_gb_hours=storage_gb_hours,
             network_gb=network_gb,
             is_simulated=True,
-            dry_run_mode=self.config.safety.dry_run
+            dry_run_mode=self.config.safety.dry_run,
         )
 
         self.estimates_cache[cache_key] = estimate
@@ -145,8 +147,10 @@ class CostSimulator:
 
         # Simulate batch processing cost calculation
         total_time_hours = (batch_size * processing_time_per_item) / 3600.0
-        cpu_cost = total_time_hours * self.SIMULATED_PRICING['cpu_core_hour']
-        memory_cost = total_time_hours * 0.5 * self.SIMULATED_PRICING['memory_gb_hour']  # 0.5 GB average
+        cpu_cost = total_time_hours * self.SIMULATED_PRICING["cpu_core_hour"]
+        memory_cost = (
+            total_time_hours * 0.5 * self.SIMULATED_PRICING["memory_gb_hour"]
+        )  # 0.5 GB average
 
         return cpu_cost + memory_cost
 
@@ -166,7 +170,7 @@ class CostSimulator:
                 estimated_cost_usd=0.0,
                 breakdown={},
                 duration_hours=0.0,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
             )
 
         # Estimate individual job costs
@@ -177,7 +181,7 @@ class CostSimulator:
         total_duration = max(est.duration_hours for est in job_estimates)  # Parallel execution
 
         # Combine breakdowns
-        combined_breakdown = {}
+        combined_breakdown: Dict[str, float] = {}
         for estimate in job_estimates:
             for category, cost in estimate.breakdown.items():
                 combined_breakdown[category] = combined_breakdown.get(category, 0.0) + cost
@@ -201,7 +205,7 @@ class CostSimulator:
             storage_gb_hours=total_storage_hours,
             network_gb=total_network_gb,
             is_simulated=True,
-            dry_run_mode=self.config.safety.dry_run
+            dry_run_mode=self.config.safety.dry_run,
         )
 
     def estimate_swarm_cost(self, node_count: int, duration_hours: float) -> CostEstimate:
@@ -245,7 +249,7 @@ class CostSimulator:
             storage_gb_hours=0.0,
             network_gb=0.1 * node_count,
             is_simulated=True,
-            dry_run_mode=self.config.safety.dry_run
+            dry_run_mode=self.config.safety.dry_run,
         )
 
     def check_cost_cap(self, estimated_cost: float, operation: str = "operation"):
@@ -261,9 +265,7 @@ class CostSimulator:
         """
         # Check against global cost cap
         if estimated_cost > self.config.safety.cost_cap_usd:
-            raise CostCapExceededError(
-                estimated_cost, self.config.safety.cost_cap_usd, operation
-            )
+            raise CostCapExceededError(estimated_cost, self.config.safety.cost_cap_usd, operation)
 
         # Check against per-job cost cap
         if estimated_cost > self.config.safety.max_job_cost_usd:
@@ -271,7 +273,9 @@ class CostSimulator:
                 estimated_cost, self.config.safety.max_job_cost_usd, operation
             )
 
-    def get_cost_summary(self, start_time: datetime, end_time: Optional[datetime] = None) -> Dict[str, Any]:
+    def get_cost_summary(
+        self, start_time: datetime, end_time: Optional[datetime] = None
+    ) -> Dict[str, Any]:
         """
         Get summary of all cost estimates within a time range.
 
@@ -287,20 +291,19 @@ class CostSimulator:
 
         # Filter estimates by time range
         relevant_estimates = [
-            est for est in self.estimates_cache.values()
-            if start_time <= est.timestamp <= end_time
+            est for est in self.estimates_cache.values() if start_time <= est.timestamp <= end_time
         ]
 
         if not relevant_estimates:
             return {
-                'total_operations': 0,
-                'total_cost_usd': 0.0,
-                'total_cpu_hours': 0.0,
-                'total_memory_gb_hours': 0.0,
-                'total_gpu_hours': 0.0,
-                'avg_cost_per_operation': 0.0,
-                'cost_breakdown': {},
-                'dry_run_mode': self.config.safety.dry_run
+                "total_operations": 0,
+                "total_cost_usd": 0.0,
+                "total_cpu_hours": 0.0,
+                "total_memory_gb_hours": 0.0,
+                "total_gpu_hours": 0.0,
+                "avg_cost_per_operation": 0.0,
+                "cost_breakdown": {},
+                "dry_run_mode": self.config.safety.dry_run,
             }
 
         # Calculate summary statistics
@@ -310,24 +313,21 @@ class CostSimulator:
         total_gpu_hours = sum(est.gpu_hours for est in relevant_estimates)
 
         # Combine cost breakdowns
-        combined_breakdown = {}
+        combined_breakdown: Dict[str, float] = {}
         for estimate in relevant_estimates:
             for category, cost in estimate.breakdown.items():
                 combined_breakdown[category] = combined_breakdown.get(category, 0.0) + cost
 
         return {
-            'total_operations': len(relevant_estimates),
-            'total_cost_usd': total_cost,
-            'total_cpu_hours': total_cpu_hours,
-            'total_memory_gb_hours': total_memory_hours,
-            'total_gpu_hours': total_gpu_hours,
-            'avg_cost_per_operation': total_cost / len(relevant_estimates),
-            'cost_breakdown': combined_breakdown,
-            'dry_run_mode': self.config.safety.dry_run,
-            'time_range': {
-                'start': start_time.isoformat(),
-                'end': end_time.isoformat()
-            }
+            "total_operations": len(relevant_estimates),
+            "total_cost_usd": total_cost,
+            "total_cpu_hours": total_cpu_hours,
+            "total_memory_gb_hours": total_memory_hours,
+            "total_gpu_hours": total_gpu_hours,
+            "avg_cost_per_operation": total_cost / len(relevant_estimates),
+            "cost_breakdown": combined_breakdown,
+            "dry_run_mode": self.config.safety.dry_run,
+            "time_range": {"start": start_time.isoformat(), "end": end_time.isoformat()},
         }
 
     def _calculate_cost_breakdown(
@@ -336,15 +336,15 @@ class CostSimulator:
         memory_gb_hours: float,
         gpu_hours: float,
         storage_gb_hours: float,
-        network_gb: float
+        network_gb: float,
     ) -> Dict[str, float]:
         """Calculate detailed cost breakdown."""
         breakdown = {
-            'cpu': cpu_core_hours * self.SIMULATED_PRICING['cpu_core_hour'],
-            'memory': memory_gb_hours * self.SIMULATED_PRICING['memory_gb_hour'],
-            'gpu': gpu_hours * self.SIMULATED_PRICING['gpu_hour'],
-            'storage': storage_gb_hours * self.SIMULATED_PRICING['storage_gb_hour'],
-            'network': network_gb * self.SIMULATED_PRICING['network_gb']
+            "cpu": cpu_core_hours * self.SIMULATED_PRICING["cpu_core_hour"],
+            "memory": memory_gb_hours * self.SIMULATED_PRICING["memory_gb_hour"],
+            "gpu": gpu_hours * self.SIMULATED_PRICING["gpu_hour"],
+            "storage": storage_gb_hours * self.SIMULATED_PRICING["storage_gb_hour"],
+            "network": network_gb * self.SIMULATED_PRICING["network_gb"],
         }
 
         return breakdown
@@ -358,28 +358,30 @@ class CostSimulator:
         import json
 
         export_data = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'dry_run_mode': self.config.safety.dry_run,
-            'estimates': []
+            "timestamp": datetime.utcnow().isoformat(),
+            "dry_run_mode": self.config.safety.dry_run,
+            "estimates": [],
         }
 
         for estimate in self.estimates_cache.values():
-            export_data['estimates'].append({
-                'operation_type': estimate.operation_type,
-                'estimated_cost_usd': estimate.estimated_cost_usd,
-                'breakdown': estimate.breakdown,
-                'duration_hours': estimate.duration_hours,
-                'timestamp': estimate.timestamp.isoformat(),
-                'cpu_core_hours': estimate.cpu_core_hours,
-                'memory_gb_hours': estimate.memory_gb_hours,
-                'gpu_hours': estimate.gpu_hours,
-                'storage_gb_hours': estimate.storage_gb_hours,
-                'network_gb': estimate.network_gb,
-                'is_simulated': estimate.is_simulated,
-                'dry_run_mode': estimate.dry_run_mode
-            })
+            export_data["estimates"].append(
+                {
+                    "operation_type": estimate.operation_type,
+                    "estimated_cost_usd": estimate.estimated_cost_usd,
+                    "breakdown": estimate.breakdown,
+                    "duration_hours": estimate.duration_hours,
+                    "timestamp": estimate.timestamp.isoformat(),
+                    "cpu_core_hours": estimate.cpu_core_hours,
+                    "memory_gb_hours": estimate.memory_gb_hours,
+                    "gpu_hours": estimate.gpu_hours,
+                    "storage_gb_hours": estimate.storage_gb_hours,
+                    "network_gb": estimate.network_gb,
+                    "is_simulated": estimate.is_simulated,
+                    "dry_run_mode": estimate.dry_run_mode,
+                }
+            )
 
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             json.dump(export_data, f, indent=2)
 
 

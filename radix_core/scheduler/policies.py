@@ -9,12 +9,12 @@ import heapq
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Dict, Any, Set
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Set
 
-from ..types import Job, ResourceRequirements
 from ..config import get_config
 from ..logging import get_logger
+from ..types import Job, ResourceRequirements
 
 logger = get_logger(__name__)
 
@@ -48,8 +48,9 @@ class SchedulingPolicy(ABC):
         self.job_history: List[SchedulingDecision] = []
 
     @abstractmethod
-    def select_jobs(self, ready_jobs: List[Job], available_resources: ResourceRequirements,
-                   max_jobs: int = None) -> List[SchedulingDecision]:
+    def select_jobs(
+        self, ready_jobs: List[Job], available_resources: ResourceRequirements, max_jobs: int = None
+    ) -> List[SchedulingDecision]:
         """
         Select jobs to schedule from the list of ready jobs.
 
@@ -90,23 +91,23 @@ class SchedulingPolicy(ABC):
         """Get statistics about this scheduling policy's performance."""
         if not self.job_history:
             return {
-                'policy_name': self.name,
-                'decisions_made': self.decisions_made,
-                'avg_priority_score': 0.0,
-                'avg_estimated_duration': 0.0
+                "policy_name": self.name,
+                "decisions_made": self.decisions_made,
+                "avg_priority_score": 0.0,
+                "avg_estimated_duration": 0.0,
             }
 
         priority_scores = [d.priority_score for d in self.job_history]
         durations = [d.estimated_duration for d in self.job_history]
 
         return {
-            'policy_name': self.name,
-            'decisions_made': self.decisions_made,
-            'avg_priority_score': sum(priority_scores) / len(priority_scores),
-            'max_priority_score': max(priority_scores),
-            'min_priority_score': min(priority_scores),
-            'avg_estimated_duration': sum(durations) / len(durations),
-            'total_estimated_duration': sum(durations)
+            "policy_name": self.name,
+            "decisions_made": self.decisions_made,
+            "avg_priority_score": sum(priority_scores) / len(priority_scores),
+            "max_priority_score": max(priority_scores),
+            "min_priority_score": min(priority_scores),
+            "avg_estimated_duration": sum(durations) / len(durations),
+            "total_estimated_duration": sum(durations),
         }
 
 
@@ -121,8 +122,9 @@ class FIFOPolicy(SchedulingPolicy):
     def __init__(self):
         super().__init__("FIFO")
 
-    def select_jobs(self, ready_jobs: List[Job], available_resources: ResourceRequirements,
-                   max_jobs: int = None) -> List[SchedulingDecision]:
+    def select_jobs(
+        self, ready_jobs: List[Job], available_resources: ResourceRequirements, max_jobs: int = None
+    ) -> List[SchedulingDecision]:
         """Select jobs in FIFO order."""
         if not ready_jobs:
             return []
@@ -130,7 +132,7 @@ class FIFOPolicy(SchedulingPolicy):
         # Sort by creation time (FIFO)
         sorted_jobs = sorted(ready_jobs, key=lambda j: j.created_at)
 
-        decisions = []
+        decisions: List[SchedulingDecision] = []
         current_time = datetime.utcnow()
 
         for job in sorted_jobs:
@@ -150,7 +152,7 @@ class FIFOPolicy(SchedulingPolicy):
                 estimated_duration=job.estimated_duration(),
                 resource_allocation=self._create_resource_allocation(job.requirements),
                 reasoning=f"FIFO order (created at {job.created_at.isoformat()})",
-                metadata={'policy': self.name, 'creation_time': job.created_at.isoformat()}
+                metadata={"policy": self.name, "creation_time": job.created_at.isoformat()},
             )
 
             decisions.append(decision)
@@ -169,14 +171,15 @@ class FIFOPolicy(SchedulingPolicy):
     def _create_resource_allocation(self, requirements: ResourceRequirements) -> Dict[str, Any]:
         """Create resource allocation dictionary."""
         return {
-            'cpu_cores': requirements.cpu_cores,
-            'memory_mb': requirements.memory_mb,
-            'gpu_count': requirements.gpu_count,
-            'gpu_memory_mb': requirements.gpu_memory_mb
+            "cpu_cores": requirements.cpu_cores,
+            "memory_mb": requirements.memory_mb,
+            "gpu_count": requirements.gpu_count,
+            "gpu_memory_mb": requirements.gpu_memory_mb,
         }
 
-    def _subtract_resources(self, available: ResourceRequirements,
-                          required: ResourceRequirements) -> ResourceRequirements:
+    def _subtract_resources(
+        self, available: ResourceRequirements, required: ResourceRequirements
+    ) -> ResourceRequirements:
         """Subtract required resources from available resources."""
         return ResourceRequirements(
             cpu_cores=max(0, available.cpu_cores - required.cpu_cores),
@@ -184,7 +187,7 @@ class FIFOPolicy(SchedulingPolicy):
             gpu_count=max(0, available.gpu_count - required.gpu_count),
             gpu_memory_mb=max(0, available.gpu_memory_mb - required.gpu_memory_mb),
             storage_mb=max(0, available.storage_mb - required.storage_mb),
-            network_mbps=max(0, available.network_mbps - required.network_mbps)
+            network_mbps=max(0, available.network_mbps - required.network_mbps),
         )
 
 
@@ -199,14 +202,15 @@ class PriorityPolicy(SchedulingPolicy):
     def __init__(self, priority_weights: Dict[str, float] = None):
         super().__init__("Priority")
         self.priority_weights = priority_weights or {
-            'base_priority': 1.0,
-            'age_factor': 0.1,
-            'resource_efficiency': 0.2,
-            'estimated_duration': -0.05  # Prefer shorter jobs slightly
+            "base_priority": 1.0,
+            "age_factor": 0.1,
+            "resource_efficiency": 0.2,
+            "estimated_duration": -0.05,  # Prefer shorter jobs slightly
         }
 
-    def select_jobs(self, ready_jobs: List[Job], available_resources: ResourceRequirements,
-                   max_jobs: int = None) -> List[SchedulingDecision]:
+    def select_jobs(
+        self, ready_jobs: List[Job], available_resources: ResourceRequirements, max_jobs: int = None
+    ) -> List[SchedulingDecision]:
         """Select jobs based on priority scores."""
         if not ready_jobs:
             return []
@@ -221,7 +225,7 @@ class PriorityPolicy(SchedulingPolicy):
         # Sort by priority (highest first)
         job_priorities.sort(key=lambda x: x[0], reverse=True)
 
-        decisions = []
+        decisions: List[SchedulingDecision] = []
         current_time = datetime.utcnow()
         remaining_resources = available_resources
 
@@ -240,10 +244,10 @@ class PriorityPolicy(SchedulingPolicy):
                 resource_allocation=self._create_resource_allocation(job.requirements),
                 reasoning=f"Priority score: {priority_score:.2f}",
                 metadata={
-                    'policy': self.name,
-                    'base_priority': job.priority,
-                    'calculated_priority': priority_score
-                }
+                    "policy": self.name,
+                    "base_priority": job.priority,
+                    "calculated_priority": priority_score,
+                },
             )
 
             decisions.append(decision)
@@ -259,28 +263,30 @@ class PriorityPolicy(SchedulingPolicy):
         current_time = datetime.utcnow()
 
         # Base priority from job
-        base_priority = job.priority * self.priority_weights['base_priority']
+        base_priority = job.priority * self.priority_weights["base_priority"]
 
         # Age factor (older jobs get higher priority)
         age_hours = (current_time - job.created_at).total_seconds() / 3600.0
-        age_factor = age_hours * self.priority_weights['age_factor']
+        age_factor = age_hours * self.priority_weights["age_factor"]
 
         # Resource efficiency (prefer jobs that use resources efficiently)
         resource_efficiency = self._calculate_resource_efficiency(job.requirements)
-        efficiency_factor = resource_efficiency * self.priority_weights['resource_efficiency']
+        efficiency_factor = resource_efficiency * self.priority_weights["resource_efficiency"]
 
         # Duration factor (slight preference for shorter jobs)
-        duration_factor = job.estimated_duration() * self.priority_weights['estimated_duration']
+        duration_factor = job.estimated_duration() * self.priority_weights["estimated_duration"]
 
         total_priority = base_priority + age_factor + efficiency_factor + duration_factor
 
-        logger.debug("Priority calculation",
-                    job_id=job.job_id,
-                    base_priority=base_priority,
-                    age_factor=age_factor,
-                    efficiency_factor=efficiency_factor,
-                    duration_factor=duration_factor,
-                    total_priority=total_priority)
+        logger.debug(
+            "Priority calculation",
+            job_id=job.job_id,
+            base_priority=base_priority,
+            age_factor=age_factor,
+            efficiency_factor=efficiency_factor,
+            duration_factor=duration_factor,
+            total_priority=total_priority,
+        )
 
         return total_priority
 
@@ -304,14 +310,15 @@ class PriorityPolicy(SchedulingPolicy):
     def _create_resource_allocation(self, requirements: ResourceRequirements) -> Dict[str, Any]:
         """Create resource allocation dictionary."""
         return {
-            'cpu_cores': requirements.cpu_cores,
-            'memory_mb': requirements.memory_mb,
-            'gpu_count': requirements.gpu_count,
-            'gpu_memory_mb': requirements.gpu_memory_mb
+            "cpu_cores": requirements.cpu_cores,
+            "memory_mb": requirements.memory_mb,
+            "gpu_count": requirements.gpu_count,
+            "gpu_memory_mb": requirements.gpu_memory_mb,
         }
 
-    def _subtract_resources(self, available: ResourceRequirements,
-                          required: ResourceRequirements) -> ResourceRequirements:
+    def _subtract_resources(
+        self, available: ResourceRequirements, required: ResourceRequirements
+    ) -> ResourceRequirements:
         """Subtract required resources from available resources."""
         return ResourceRequirements(
             cpu_cores=max(0, available.cpu_cores - required.cpu_cores),
@@ -319,7 +326,7 @@ class PriorityPolicy(SchedulingPolicy):
             gpu_count=max(0, available.gpu_count - required.gpu_count),
             gpu_memory_mb=max(0, available.gpu_memory_mb - required.gpu_memory_mb),
             storage_mb=max(0, available.storage_mb - required.storage_mb),
-            network_mbps=max(0, available.network_mbps - required.network_mbps)
+            network_mbps=max(0, available.network_mbps - required.network_mbps),
         )
 
 
@@ -337,8 +344,9 @@ class FairSharePolicy(SchedulingPolicy):
         self.usage_history: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         self.fair_shares: Dict[str, float] = defaultdict(lambda: 1.0)  # Equal shares by default
 
-    def select_jobs(self, ready_jobs: List[Job], available_resources: ResourceRequirements,
-                   max_jobs: int = None) -> List[SchedulingDecision]:
+    def select_jobs(
+        self, ready_jobs: List[Job], available_resources: ResourceRequirements, max_jobs: int = None
+    ) -> List[SchedulingDecision]:
         """Select jobs based on fair share principles."""
         if not ready_jobs:
             return []
@@ -350,21 +358,23 @@ class FairSharePolicy(SchedulingPolicy):
         job_groups = self._group_jobs_by_entity(ready_jobs)
 
         # Calculate fair share priorities
-        entity_priorities = self._calculate_entity_priorities(job_groups.keys())
+        entity_priorities = self._calculate_entity_priorities(set(job_groups.keys()))
 
         # Select jobs using fair share algorithm
-        decisions = []
+        decisions: List[SchedulingDecision] = []
         current_time = datetime.utcnow()
         remaining_resources = available_resources
 
         # Create priority queue of (priority, entity, job_index)
-        priority_queue = []
+        priority_queue: List[Any] = []
 
         for entity, jobs in job_groups.items():
             entity_priority = entity_priorities[entity]
             for i, job in enumerate(jobs):
                 if job.requirements.is_satisfied_by(remaining_resources):
-                    job_priority = self.calculate_priority(job, {'entity_priority': entity_priority})
+                    job_priority = self.calculate_priority(
+                        job, {"entity_priority": entity_priority}
+                    )
                     heapq.heappush(priority_queue, (-job_priority, entity, i, job))
 
         # Select jobs from priority queue
@@ -383,11 +393,11 @@ class FairSharePolicy(SchedulingPolicy):
                 resource_allocation=self._create_resource_allocation(job.requirements),
                 reasoning=f"Fair share priority: {priority_score:.2f} (entity: {entity})",
                 metadata={
-                    'policy': self.name,
-                    'entity': entity,
-                    'entity_priority': entity_priorities[entity],
-                    'fair_share_score': priority_score
-                }
+                    "policy": self.name,
+                    "entity": entity,
+                    "entity_priority": entity_priorities[entity],
+                    "fair_share_score": priority_score,
+                },
             )
 
             decisions.append(decision)
@@ -404,7 +414,7 @@ class FairSharePolicy(SchedulingPolicy):
     def calculate_priority(self, job: Job, context: Dict[str, Any] = None) -> float:
         """Calculate fair share priority score."""
         context = context or {}
-        entity_priority = context.get('entity_priority', 1.0)
+        entity_priority = context.get("entity_priority", 1.0)
 
         # Base priority from job
         base_priority = job.priority
@@ -416,7 +426,7 @@ class FairSharePolicy(SchedulingPolicy):
         # Combine factors
         total_priority = (base_priority + age_factor) * entity_priority
 
-        return total_priority
+        return float(total_priority)
 
     def set_fair_share(self, entity: str, share: float):
         """Set the fair share allocation for an entity."""
@@ -428,7 +438,7 @@ class FairSharePolicy(SchedulingPolicy):
 
         for job in jobs:
             # Try to extract entity from job tags
-            entity = job.tags.get('user', job.tags.get('project', 'default'))
+            entity = job.tags.get("user", job.tags.get("project", "default"))
             groups[entity].append(job)
 
         return dict(groups)
@@ -461,24 +471,28 @@ class FairSharePolicy(SchedulingPolicy):
         recent_usage = 0.0
 
         for usage_record in self.usage_history[entity]:
-            if usage_record['timestamp'] >= cutoff_time:
+            if usage_record["timestamp"] >= cutoff_time:
                 # Simple usage metric: CPU hours + memory GB hours + GPU hours
-                cpu_hours = usage_record['cpu_cores'] * usage_record['duration_hours']
-                memory_gb_hours = (usage_record['memory_mb'] / 1024.0) * usage_record['duration_hours']
-                gpu_hours = usage_record['gpu_count'] * usage_record['duration_hours']
+                cpu_hours = usage_record["cpu_cores"] * usage_record["duration_hours"]
+                memory_gb_hours = (usage_record["memory_mb"] / 1024.0) * usage_record[
+                    "duration_hours"
+                ]
+                gpu_hours = usage_record["gpu_count"] * usage_record["duration_hours"]
 
                 recent_usage += cpu_hours + memory_gb_hours + gpu_hours
 
         return recent_usage
 
-    def _record_usage(self, entity: str, requirements: ResourceRequirements, duration_seconds: float):
+    def _record_usage(
+        self, entity: str, requirements: ResourceRequirements, duration_seconds: float
+    ):
         """Record resource usage for an entity."""
         usage_record = {
-            'timestamp': datetime.utcnow(),
-            'cpu_cores': requirements.cpu_cores,
-            'memory_mb': requirements.memory_mb,
-            'gpu_count': requirements.gpu_count,
-            'duration_hours': duration_seconds / 3600.0
+            "timestamp": datetime.utcnow(),
+            "cpu_cores": requirements.cpu_cores,
+            "memory_mb": requirements.memory_mb,
+            "gpu_count": requirements.gpu_count,
+            "duration_hours": duration_seconds / 3600.0,
         }
 
         self.usage_history[entity].append(usage_record)
@@ -489,21 +503,23 @@ class FairSharePolicy(SchedulingPolicy):
 
         for entity in self.usage_history:
             self.usage_history[entity] = [
-                record for record in self.usage_history[entity]
-                if record['timestamp'] >= cutoff_time
+                record
+                for record in self.usage_history[entity]
+                if record["timestamp"] >= cutoff_time
             ]
 
     def _create_resource_allocation(self, requirements: ResourceRequirements) -> Dict[str, Any]:
         """Create resource allocation dictionary."""
         return {
-            'cpu_cores': requirements.cpu_cores,
-            'memory_mb': requirements.memory_mb,
-            'gpu_count': requirements.gpu_count,
-            'gpu_memory_mb': requirements.gpu_memory_mb
+            "cpu_cores": requirements.cpu_cores,
+            "memory_mb": requirements.memory_mb,
+            "gpu_count": requirements.gpu_count,
+            "gpu_memory_mb": requirements.gpu_memory_mb,
         }
 
-    def _subtract_resources(self, available: ResourceRequirements,
-                          required: ResourceRequirements) -> ResourceRequirements:
+    def _subtract_resources(
+        self, available: ResourceRequirements, required: ResourceRequirements
+    ) -> ResourceRequirements:
         """Subtract required resources from available resources."""
         return ResourceRequirements(
             cpu_cores=max(0, available.cpu_cores - required.cpu_cores),
@@ -511,7 +527,7 @@ class FairSharePolicy(SchedulingPolicy):
             gpu_count=max(0, available.gpu_count - required.gpu_count),
             gpu_memory_mb=max(0, available.gpu_memory_mb - required.gpu_memory_mb),
             storage_mb=max(0, available.storage_mb - required.storage_mb),
-            network_mbps=max(0, available.network_mbps - required.network_mbps)
+            network_mbps=max(0, available.network_mbps - required.network_mbps),
         )
 
 
@@ -526,20 +542,22 @@ class ShortestJobFirstPolicy(SchedulingPolicy):
     def __init__(self):
         super().__init__("ShortestJobFirst")
 
-    def select_jobs(self, ready_jobs: List[Job], available_resources: ResourceRequirements,
-                   max_jobs: int = None) -> List[SchedulingDecision]:
+    def select_jobs(
+        self, ready_jobs: List[Job], available_resources: ResourceRequirements, max_jobs: int = None
+    ) -> List[SchedulingDecision]:
         """Select jobs based on shortest estimated duration."""
         if not ready_jobs:
             return []
 
         # Filter jobs that can fit in available resources
-        feasible_jobs = [job for job in ready_jobs
-                        if job.requirements.is_satisfied_by(available_resources)]
+        feasible_jobs = [
+            job for job in ready_jobs if job.requirements.is_satisfied_by(available_resources)
+        ]
 
         # Sort by estimated duration (shortest first)
         sorted_jobs = sorted(feasible_jobs, key=lambda j: j.estimated_duration())
 
-        decisions = []
+        decisions: List[SchedulingDecision] = []
         current_time = datetime.utcnow()
         remaining_resources = available_resources
 
@@ -559,10 +577,7 @@ class ShortestJobFirstPolicy(SchedulingPolicy):
                 estimated_duration=job.estimated_duration(),
                 resource_allocation=self._create_resource_allocation(job.requirements),
                 reasoning=f"Shortest job first (duration: {job.estimated_duration():.1f}s)",
-                metadata={
-                    'policy': self.name,
-                    'estimated_duration': job.estimated_duration()
-                }
+                metadata={"policy": self.name, "estimated_duration": job.estimated_duration()},
             )
 
             decisions.append(decision)
@@ -586,14 +601,15 @@ class ShortestJobFirstPolicy(SchedulingPolicy):
     def _create_resource_allocation(self, requirements: ResourceRequirements) -> Dict[str, Any]:
         """Create resource allocation dictionary."""
         return {
-            'cpu_cores': requirements.cpu_cores,
-            'memory_mb': requirements.memory_mb,
-            'gpu_count': requirements.gpu_count,
-            'gpu_memory_mb': requirements.gpu_memory_mb
+            "cpu_cores": requirements.cpu_cores,
+            "memory_mb": requirements.memory_mb,
+            "gpu_count": requirements.gpu_count,
+            "gpu_memory_mb": requirements.gpu_memory_mb,
         }
 
-    def _subtract_resources(self, available: ResourceRequirements,
-                          required: ResourceRequirements) -> ResourceRequirements:
+    def _subtract_resources(
+        self, available: ResourceRequirements, required: ResourceRequirements
+    ) -> ResourceRequirements:
         """Subtract required resources from available resources."""
         return ResourceRequirements(
             cpu_cores=max(0, available.cpu_cores - required.cpu_cores),
@@ -601,5 +617,5 @@ class ShortestJobFirstPolicy(SchedulingPolicy):
             gpu_count=max(0, available.gpu_count - required.gpu_count),
             gpu_memory_mb=max(0, available.gpu_memory_mb - required.gpu_memory_mb),
             storage_mb=max(0, available.storage_mb - required.storage_mb),
-            network_mbps=max(0, available.network_mbps - required.network_mbps)
+            network_mbps=max(0, available.network_mbps - required.network_mbps),
         )

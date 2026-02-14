@@ -1,14 +1,15 @@
 """Integration tests for end-to-end workflows."""
 
 import pytest
+
 from radix_core.config import get_config
-from radix_core.types import Job, ResourceRequirements
-from radix_core.scheduler.job_graph import JobGraph
-from radix_core.scheduler.planner import GreedyPlanner
-from radix_core.scheduler.placement import LocalPlacement
-from radix_core.scheduler.policies import FIFOPolicy, PriorityPolicy
 from radix_core.cost_simulator import CostSimulator
 from radix_core.dryrun import DryRunGuard
+from radix_core.scheduler.job_graph import JobGraph
+from radix_core.scheduler.placement import LocalPlacement
+from radix_core.scheduler.planner import GreedyPlanner
+from radix_core.scheduler.policies import FIFOPolicy, PriorityPolicy
+from radix_core.types import Job, ResourceRequirements
 
 
 @pytest.mark.integration
@@ -65,15 +66,15 @@ class TestSchedulingWorkflow:
     def test_policy_driven_scheduling(self):
         """Test scheduling with different policies."""
         available = ResourceRequirements(
-            cpu_cores=16.0, memory_mb=32768,
-            gpu_count=0, gpu_memory_mb=0,
-            storage_mb=100000, network_mbps=1000.0,
+            cpu_cores=16.0,
+            memory_mb=32768,
+            gpu_count=0,
+            gpu_memory_mb=0,
+            storage_mb=100000,
+            network_mbps=1000.0,
         )
 
-        jobs = [
-            Job(name=f"job-{i}", command=f"echo {i}", priority=i)
-            for i in range(5)
-        ]
+        jobs = [Job(name=f"job-{i}", command=f"echo {i}", priority=i) for i in range(5)]
 
         # FIFO policy
         fifo = FIFOPolicy()
@@ -106,10 +107,7 @@ class TestCostWorkflow:
 
     def test_schedule_cost_estimation(self):
         simulator = CostSimulator()
-        jobs = [
-            Job(name=f"j{i}", command=f"echo {i}")
-            for i in range(10)
-        ]
+        jobs = [Job(name=f"j{i}", command=f"echo {i}") for i in range(10)]
         estimate = simulator.estimate_schedule_cost(jobs)
         assert estimate.estimated_cost_usd == 0.0
         assert estimate.duration_hours > 0
@@ -137,6 +135,7 @@ class TestProductionModeIntegration:
 
     def test_production_config_loads(self, monkeypatch):
         from radix_core.config import RadixConfig, reset_config
+
         monkeypatch.setenv("RADIX_MODE", "production")
         reset_config()
         cfg = RadixConfig.from_env()
@@ -147,6 +146,7 @@ class TestProductionModeIntegration:
 
     def test_production_dryrun_guard_executes(self, monkeypatch):
         from radix_core.config import RadixConfig, reset_config, set_config
+
         monkeypatch.setenv("RADIX_MODE", "production")
         reset_config()
         cfg = RadixConfig.from_env()
@@ -160,6 +160,7 @@ class TestProductionModeIntegration:
 
     def test_production_cost_estimation(self, monkeypatch):
         from radix_core.config import RadixConfig, reset_config, set_config
+
         monkeypatch.setenv("RADIX_MODE", "production")
         reset_config()
         cfg = RadixConfig.from_env()

@@ -6,16 +6,17 @@ Implements various planning algorithms for job scheduling and resource allocatio
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List
 
-from ..types import Job
 from ..logging import get_logger
+from ..types import Job
 
 
 @dataclass
 class ExecutionPlan:
     """Execution plan for a set of jobs."""
+
     plan_id: str
     scheduled_jobs: List[Job]
     estimated_completion_time: datetime
@@ -90,7 +91,7 @@ class GreedyPlanner(SchedulePlanner):
                 plan_id=f"greedy_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                 scheduled_jobs=[],
                 estimated_completion_time=datetime.now(),
-                resource_requirements={}
+                resource_requirements={},
             )
 
         # Validate dependencies
@@ -121,21 +122,23 @@ class GreedyPlanner(SchedulePlanner):
             resource_requirements={
                 "cpu_cores": total_cpu,
                 "memory_gb": total_memory,
-                "gpu_count": total_gpu
+                "gpu_count": total_gpu,
             },
             dependencies_resolved=dependencies_ok,
             plan_metadata={
                 "planner_type": "greedy",
                 "job_count": len(scheduled_jobs),
-                "estimated_runtime_seconds": total_runtime
-            }
+                "estimated_runtime_seconds": total_runtime,
+            },
         )
 
-        self.logger.info("Created greedy execution plan",
-                        job_count=len(scheduled_jobs),
-                        dependencies_resolved=dependencies_ok,
-                        total_cpu=total_cpu,
-                        total_memory=total_memory)
+        self.logger.info(
+            "Created greedy execution plan",
+            job_count=len(scheduled_jobs),
+            dependencies_resolved=dependencies_ok,
+            total_cpu=total_cpu,
+            total_memory=total_memory,
+        )
 
         return plan
 
@@ -153,7 +156,7 @@ class OptimalPlanner(SchedulePlanner):
                 plan_id=f"optimal_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                 scheduled_jobs=[],
                 estimated_completion_time=datetime.now(),
-                resource_requirements={}
+                resource_requirements={},
             )
 
         # For simplicity, use greedy approach but with more sophisticated scoring
@@ -167,9 +170,11 @@ class OptimalPlanner(SchedulePlanner):
         # Score jobs based on multiple criteria
         def job_score(job: Job) -> float:
             # Higher priority, shorter runtime, fewer resources = higher score
-            resource_cost = (job.requirements.cpu_cores +
-                           job.requirements.memory_mb +
-                           job.requirements.gpu_count * 2)
+            resource_cost = (
+                job.requirements.cpu_cores
+                + job.requirements.memory_mb
+                + job.requirements.gpu_count * 2
+            )
 
             runtime = (job.requirements.max_runtime_seconds or 60) / 60
             return job.priority * 100 - runtime - resource_cost
@@ -189,20 +194,22 @@ class OptimalPlanner(SchedulePlanner):
             resource_requirements={
                 "cpu_cores": total_cpu,
                 "memory_gb": total_memory,
-                "gpu_count": total_gpu
+                "gpu_count": total_gpu,
             },
             dependencies_resolved=dependencies_ok,
             plan_metadata={
                 "planner_type": "optimal",
                 "job_count": len(scheduled_jobs),
-                "optimization_score": sum(job_score(job) for job in scheduled_jobs)
-            }
+                "optimization_score": sum(job_score(job) for job in scheduled_jobs),
+            },
         )
 
-        self.logger.info("Created optimal execution plan",
-                        job_count=len(scheduled_jobs),
-                        dependencies_resolved=dependencies_ok,
-                        optimization_score=plan.plan_metadata["optimization_score"])
+        self.logger.info(
+            "Created optimal execution plan",
+            job_count=len(scheduled_jobs),
+            dependencies_resolved=dependencies_ok,
+            optimization_score=plan.plan_metadata["optimization_score"],
+        )
 
         return plan
 

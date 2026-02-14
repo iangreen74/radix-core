@@ -5,8 +5,9 @@ This module provides centralized configuration management with safety-first
 principles using Pydantic settings. All safety-critical settings are immutable and validated.
 """
 
-from typing import Optional, List
 from pathlib import Path
+from typing import List, Optional
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -16,24 +17,30 @@ class SafetyConfig(BaseSettings):
 
     # Core safety settings - NEVER modify these defaults
     dry_run: bool = Field(default=True, description="Enable dry-run mode (REQUIRED)")
-    no_deploy_mode: bool = Field(default=True, description="Disable deployment operations (REQUIRED)")
+    no_deploy_mode: bool = Field(
+        default=True, description="Disable deployment operations (REQUIRED)"
+    )
     cost_cap_usd: float = Field(default=0.00, description="Maximum cost in USD (REQUIRED: 0.00)")
-    max_job_cost_usd: float = Field(default=0.00, description="Maximum per-job cost in USD (REQUIRED: 0.00)")
+    max_job_cost_usd: float = Field(
+        default=0.00, description="Maximum per-job cost in USD (REQUIRED: 0.00)"
+    )
 
-    @field_validator('dry_run')
+    @field_validator("dry_run")
     @classmethod
     def validate_dry_run(cls, v):
         from .mode import is_production
+
         if is_production():
             return v  # Allow any value in production
         if not v:
             raise ValueError("DRY_RUN must be True for safety")
         return v
 
-    @field_validator('cost_cap_usd')
+    @field_validator("cost_cap_usd")
     @classmethod
     def validate_cost_cap(cls, v):
         from .mode import is_production
+
         if is_production():
             if v <= 0:
                 raise ValueError("COST_CAP_USD must be > 0 in production mode")
@@ -42,10 +49,11 @@ class SafetyConfig(BaseSettings):
             raise ValueError("COST_CAP_USD must be 0.00 for safety")
         return v
 
-    @field_validator('max_job_cost_usd')
+    @field_validator("max_job_cost_usd")
     @classmethod
     def validate_max_job_cost(cls, v):
         from .mode import is_production
+
         if is_production():
             if v <= 0:
                 raise ValueError("MAX_JOB_COST_USD must be > 0 in production mode")
@@ -54,10 +62,11 @@ class SafetyConfig(BaseSettings):
             raise ValueError("MAX_JOB_COST_USD must be 0.00 for safety")
         return v
 
-    @field_validator('no_deploy_mode')
+    @field_validator("no_deploy_mode")
     @classmethod
     def validate_no_deploy(cls, v):
         from .mode import is_production
+
         if is_production():
             return v  # Allow any value in production
         if not v:
@@ -81,17 +90,21 @@ class ExecutionConfig(BaseSettings):
     ray_num_gpus: int = Field(default=0, description="Ray GPU allocation")
 
     # Cost simulation rates
-    cpu_cost_per_sec_usd: float = Field(default=0.00, description="CPU cost per second (dry-run: 0.00)")
-    gpu_cost_per_sec_usd: float = Field(default=0.00, description="GPU cost per second (dry-run: 0.00)")
+    cpu_cost_per_sec_usd: float = Field(
+        default=0.00, description="CPU cost per second (dry-run: 0.00)"
+    )
+    gpu_cost_per_sec_usd: float = Field(
+        default=0.00, description="GPU cost per second (dry-run: 0.00)"
+    )
 
-    @field_validator('max_parallelism')
+    @field_validator("max_parallelism")
     @classmethod
     def validate_max_parallelism(cls, v):
         if v < 1 or v > 64:
             raise ValueError("max_parallelism must be between 1 and 64")
         return v
 
-    @field_validator('default_executor')
+    @field_validator("default_executor")
     @classmethod
     def validate_executor(cls, v):
         valid_executors = ["threadpool", "ray_local", "local_subprocess"]
@@ -99,20 +112,22 @@ class ExecutionConfig(BaseSettings):
             raise ValueError(f"default_executor must be one of {valid_executors}")
         return v
 
-    @field_validator('ray_local_mode')
+    @field_validator("ray_local_mode")
     @classmethod
     def validate_ray_local(cls, v):
         from .mode import is_production
+
         if is_production():
             return v  # Allow remote Ray in production
         if not v:
             raise ValueError("Ray must be in local mode for safety")
         return v
 
-    @field_validator('cpu_cost_per_sec_usd', 'gpu_cost_per_sec_usd')
+    @field_validator("cpu_cost_per_sec_usd", "gpu_cost_per_sec_usd")
     @classmethod
     def validate_cost_rates(cls, v):
         from .mode import is_production
+
         if is_production():
             return v  # Allow real cost rates in production
         if v != 0.0:
@@ -132,21 +147,21 @@ class BatchingConfig(BaseSettings):
     enable_dynamic_batching: bool = Field(default=True, description="Enable dynamic batching")
     microbatch_size: int = Field(default=8, description="Microbatch size for memory efficiency")
 
-    @field_validator('batch_latency_ms')
+    @field_validator("batch_latency_ms")
     @classmethod
     def validate_latency(cls, v):
         if v < 1 or v > 10000:
             raise ValueError("batch_latency_ms must be between 1 and 10000")
         return v
 
-    @field_validator('max_batch_size')
+    @field_validator("max_batch_size")
     @classmethod
     def validate_max_batch(cls, v):
         if v < 1 or v > 1024:
             raise ValueError("max_batch_size must be between 1 and 1024")
         return v
 
-    @field_validator('microbatch_size')
+    @field_validator("microbatch_size")
     @classmethod
     def validate_microbatch(cls, v):
         # Note: Cross-field validation moved to model_validator in Pydantic v2
@@ -176,7 +191,7 @@ class MLConfig(BaseSettings):
     gradient_accumulation_steps: int = Field(default=4, description="Gradient accumulation")
     max_steps: int = Field(default=100, description="Maximum training steps")
 
-    @field_validator('precision')
+    @field_validator("precision")
     @classmethod
     def validate_precision(cls, v):
         valid_precisions = ["fp16", "fp32", "bf16"]
@@ -184,7 +199,7 @@ class MLConfig(BaseSettings):
             raise ValueError(f"precision must be one of {valid_precisions}")
         return v
 
-    @field_validator('lora_r')
+    @field_validator("lora_r")
     @classmethod
     def validate_lora_r(cls, v):
         if v < 1 or v > 256:
@@ -206,17 +221,19 @@ class SwarmConfig(BaseSettings):
 
     # Membership and rebalancing
     gossip_interval_sec: int = Field(default=2, description="Gossip protocol interval")
-    rebalance_threshold: float = Field(default=0.2, description="Load imbalance threshold for rebalancing")
+    rebalance_threshold: float = Field(
+        default=0.2, description="Load imbalance threshold for rebalancing"
+    )
     checkpoint_interval_sec: int = Field(default=60, description="Checkpoint interval")
 
-    @field_validator('node_count')
+    @field_validator("node_count")
     @classmethod
     def validate_node_count(cls, v):
         if v < 1 or v > 100:
             raise ValueError("node_count must be between 1 and 100")
         return v
 
-    @field_validator('failure_probability')
+    @field_validator("failure_probability")
     @classmethod
     def validate_failure_prob(cls, v):
         if v < 0.0 or v > 1.0:
@@ -236,7 +253,7 @@ class LoggingConfig(BaseSettings):
     enable_metrics: bool = Field(default=True, description="Enable metrics collection")
     metrics_interval_sec: int = Field(default=10, description="Metrics collection interval")
 
-    @field_validator('log_level')
+    @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v):
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -244,7 +261,7 @@ class LoggingConfig(BaseSettings):
             raise ValueError(f"log_level must be one of {valid_levels}")
         return v.upper()
 
-    @field_validator('log_format')
+    @field_validator("log_format")
     @classmethod
     def validate_log_format(cls, v):
         valid_formats = ["rich", "json", "console"]

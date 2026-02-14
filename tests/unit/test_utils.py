@@ -1,12 +1,16 @@
 """Tests for utility modules (timers, randfail)."""
 
-import pytest
 import time
 
+import pytest
+
+from radix_core.utils.randfail import FailureType, RandomFailureInjector
 from radix_core.utils.timers import (
-    Timer, TimingResult, SLAMonitor, time_operation,
+    SLAMonitor,
+    Timer,
+    TimingResult,
+    time_operation,
 )
-from radix_core.utils.randfail import RandomFailureInjector, FailureType
 
 
 class TestTimer:
@@ -46,10 +50,14 @@ class TestTimer:
 class TestTimingResult:
     def test_duration_ms(self):
         from datetime import datetime
+
         result = TimingResult(
-            operation="test", start_time=datetime.utcnow(),
-            end_time=datetime.utcnow(), duration_seconds=0.5,
-            success=True, metadata={},
+            operation="test",
+            start_time=datetime.utcnow(),
+            end_time=datetime.utcnow(),
+            duration_seconds=0.5,
+            success=True,
+            metadata={},
         )
         assert result.duration_ms == 500.0
         assert result.duration_us == 500_000.0
@@ -70,44 +78,60 @@ class TestTimeOperation:
 class TestSLAMonitor:
     def test_meets_sla(self):
         from datetime import datetime
+
         monitor = SLAMonitor(sla_targets={"fast_op": 1.0})
         result = TimingResult(
-            operation="fast_op", start_time=datetime.utcnow(),
-            end_time=datetime.utcnow(), duration_seconds=0.5,
-            success=True, metadata={},
+            operation="fast_op",
+            start_time=datetime.utcnow(),
+            end_time=datetime.utcnow(),
+            duration_seconds=0.5,
+            success=True,
+            metadata={},
         )
         assert monitor.check_sla(result) is True
         assert monitor.violations.get("fast_op", 0) == 0
 
     def test_violates_sla(self):
         from datetime import datetime
+
         monitor = SLAMonitor(sla_targets={"fast_op": 0.1})
         result = TimingResult(
-            operation="fast_op", start_time=datetime.utcnow(),
-            end_time=datetime.utcnow(), duration_seconds=0.5,
-            success=True, metadata={},
+            operation="fast_op",
+            start_time=datetime.utcnow(),
+            end_time=datetime.utcnow(),
+            duration_seconds=0.5,
+            success=True,
+            metadata={},
         )
         assert monitor.check_sla(result) is False
         assert monitor.violations["fast_op"] == 1
 
     def test_unknown_operation_passes(self):
         from datetime import datetime
+
         monitor = SLAMonitor(sla_targets={"other_op": 1.0})
         result = TimingResult(
-            operation="unknown_op", start_time=datetime.utcnow(),
-            end_time=datetime.utcnow(), duration_seconds=99.0,
-            success=True, metadata={},
+            operation="unknown_op",
+            start_time=datetime.utcnow(),
+            end_time=datetime.utcnow(),
+            duration_seconds=99.0,
+            success=True,
+            metadata={},
         )
         assert monitor.check_sla(result) is True
 
     def test_get_sla_stats(self):
         from datetime import datetime
+
         monitor = SLAMonitor(sla_targets={"op": 1.0})
         for dur in [0.1, 0.2, 0.3, 0.5, 2.0]:
             result = TimingResult(
-                operation="op", start_time=datetime.utcnow(),
-                end_time=datetime.utcnow(), duration_seconds=dur,
-                success=True, metadata={},
+                operation="op",
+                start_time=datetime.utcnow(),
+                end_time=datetime.utcnow(),
+                duration_seconds=dur,
+                success=True,
+                metadata={},
             )
             monitor.check_sla(result)
 

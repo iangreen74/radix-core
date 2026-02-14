@@ -1,12 +1,16 @@
 """Tests for batching and microbatching."""
 
 import time
+
 from radix_core.batching.dynamic_batcher import (
-    DynamicBatcher, BatchRequest, BatchingStrategy,
+    BatchingStrategy,
+    BatchRequest,
+    DynamicBatcher,
 )
 from radix_core.batching.microbatch import (
-    TextTensorEstimator, EmbeddingTensorEstimator,
+    EmbeddingTensorEstimator,
     MemoryEstimate,
+    TextTensorEstimator,
 )
 
 
@@ -17,7 +21,8 @@ class TestBatchRequest:
 
     def test_is_expired(self):
         req = BatchRequest(
-            request_id="r1", data="hello",
+            request_id="r1",
+            data="hello",
             arrival_time=time.time() - 2.0,
             max_latency_ms=1000,
         )
@@ -25,7 +30,8 @@ class TestBatchRequest:
 
     def test_not_expired(self):
         req = BatchRequest(
-            request_id="r1", data="hello",
+            request_id="r1",
+            data="hello",
             arrival_time=time.time(),
             max_latency_ms=60000,
         )
